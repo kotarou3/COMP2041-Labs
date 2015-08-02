@@ -96,6 +96,8 @@
 grep <p>|<br> /tmp/index.html
 ```
 
+ - Regex needs to be quoted to stop the shell parsing the `|` as a pipe
+ - POSIX regex (that `grep` uses by default) requires the `|` operator to be `\|`
  - The tags might be written with different case (e.g., `<bR>`)
  - The tags might have attributes (e.g., `<p class="...">`)
  - The tags might have some trailing whitespace (e.g., `<p >`)
@@ -149,4 +151,161 @@ grep '^$'
 ## 6. Write an egrep command which will print any lines in a file `ips.txt` containing an IP addresses in the range 129.94.172.1 to 129.94.172.25
 ```sh
 grep -E '129\.94\.172\.([1-9]|1[0-9]|2[0-5])'
+```
+
+## 7.
+For each of the scenarios below
+ - describe the strings being matched using an English sentence
+ - give a POSIX regular expression to match this class of strings
+
+In the examples, the expected matches are highlighted in bold.
+
+### encrypted password fields (including the surrounding colons) in a Unix password file entry
+e.g.
+
+<pre>root**:ZHolHAHZw8As2:**0:0:root:/root:/bin/bash
+jas**:nJz3ru5a/44Ko:**100:100:John Shepherd:/home/jas:/bin/bash</pre>
+
+- Second field of colon separated data, including the surrounding colons
+
+```
+/^[^:]*(:[^:]*:)/gm
+```
+
+### positive real numbers at the start of a line
+(using normal fixed-point notation for reals, *not* the kind of scientific notation you find in programming languages)
+
+e.g.
+<pre>**3.141** value of Pi
+**90.57** maximum hits/sec
+half of the time, life is silly
+**0.05**% is the legal limit
+**42** - the meaning of life
+this 1.333 is not at the start</pre>
+
+- (One or more digits, optionally followed by a decimal point and possibly more digits) or (zero or more digits, followed by a decimal point and one or more digits) at the start of the line
+
+```
+/^(\d+(?:\.\d*)?|\d*\.\d+)/gm`
+```
+
+### Names as represented in the previous question (including the special coding for persons with a single name)
+- Fifth field of colon separated data
+
+```
+/^(?:[^:]*:){4}([^:]*):/gm
+```
+
+### Names as above, but without the trailing spaces (difficult)
+*Hint:* what are given names composed of, and how many of these things can there be?
+
+See above
+
+## 8. Consider the following columnated (space-delimited) data file containing marks information for a single subject
+```
+2111321 37 FL
+2166258 67 CR
+2168678 84 DN
+2186565 77 DN
+2190546 78 DN
+2210109 50 PS
+2223455 95 HD
+2266365 55 PS
+...
+```
+
+Assume that the student number occurs at the beginning of the line, that the file is sorted on student number, and that nobody scores 100.
+
+### a. Give calls to the sort filter to display the data:
+#### i. in order on student number
+```
+sort -nk1
+```
+
+#### ii. in ascending order on mark
+```
+sort -nk2
+```
+
+#### iii. in descending order on mark
+```
+sort -nrk2
+```
+
+### b. Write calls to the grep filter to select details of:
+#### i. students who failed
+```
+grep FL
+```
+
+#### iii. students who scored above 90
+```
+grep -E '^[[:digit:]]+ 9[[:digit:]]'
+```
+
+#### iii. students with even student numbers
+```
+grep -E '^[[:digit:]]+[02468] '
+```
+
+### c. Write a pipeline to print:
+#### i. the details for the top 10 students (ordered by mark)
+```
+sort -nrk2 | head -n10
+```
+
+#### ii. the details for the bottom 5 students (ordered by mark)
+```
+sort -nrk2 | tail -n5
+```
+
+### d. Assuming that the command cut -d' ' -f 3 can extract just the grades (PS, etc.), write a pipeline to show how many people achieved each grade (i.e. the grade distribution)
+E.g. for the above data:
+```
+    1 CR
+    3 DN
+    1 FL
+    1 HD
+    2 PS
+```
+
+```
+cut -d' ' -f3 | sort | uniq -c
+```
+
+## 9. Consider the following text file containing details of tute/lab enrolments:
+```
+    2134389|Wang, Duved Seo Ken         |fri15-spoons|
+    2139656|Undirwaad, Giaffriy Jumis   |tue13-kazoo|
+    2154877|Ng, Hinry                   |tue17-kazoo|
+    2174328|Zhung, Yung                 |thu17-spoons|
+    2234136|Hso, Men-Tsun               |tue09-harp|
+    2254148|Khorme, Saneu               |tue09-harp|
+    2329667|Mahsin, Zumel               |tue17-kazoo|
+    2334348|Trun, Toyin Hong Recky      |mon11-leaf|
+    2336212|Sopuvunechyunant, Sopuchue  |mon11-leaf|
+    2344749|Chung, Wue Sun              |fri09-harp|
+    ...
+```
+
+Assuming that the file is called `enrolments`, write pipelines to answer each of the following queries:
+
+### a. Which tute is Hinry Ng enrolled in?
+```
+awk -F'|' '$2 == "Ng, Hinry                   " {print $3}' enrolments
+```
+
+### b. How many different tutorials are there?
+```
+cut -d'|' -f3 enrolments | sort -u | wc -l
+```
+
+### c. What is the number of students in each tute?
+```
+cut -d'|' -f3 enrolments | sort | uniq -c
+```
+
+### d. Are any students enrolled in multiple tutes?
+```
+sort -u enrolments | cut -d'|' -f1,2 | sort | uniq -d
 ```
