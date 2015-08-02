@@ -323,11 +323,7 @@ Not matchable by extended regex, but matchable by PCRE: ^(A(?1)?B)$
 Regexp/script:
     #!/bin/bash
 
-    while LINE=$(grep -Em1 ''); do # Not allowed to use `read` nor `readarray` mumble mumble
-        if ! grep -Eq '^A*B*$' <<< $LINE; then
-            continue
-        fi
-
+    while LINE=$(grep -Em1 '^A*B*$'); do
         PARTS=($(sed -E 's/AB/A B/' <<< $LINE))
         if test ${#PARTS[0]} -eq ${#PARTS[1]}; then
             echo $LINE
