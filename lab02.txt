@@ -1,0 +1,335 @@
+== Question 1 ==
+a) What word is on line 2000
+
+Less keystrokes: 2000g
+Word: Algonquian
+
+b) the first word in the dictionary file ending with 's
+
+Less keystrokes: /'s$<ENTER>
+Word: A's
+
+c) the last word in the dictionary that contains the substring ooz ?
+
+Less keystrokes: <END>?ooz<ENTER>
+Word: zoozoos
+
+
+== Question 2 ==
+a) How many total words does the file contain?
+
+Command: wc -w words.txt
+Answer: 390582
+
+b) How many total words, excluding those ending in "'s", are there in the dictionary?
+
+Pipeline: grep -Ev "'s$" words.txt | wc -w
+Answer: 299845
+
+c) How could you use cat -n and grep to find out which word is on line 100000?
+
+Pipeline: cat -n words.txt | grep -E $'^ *100000\t'
+Answer: adviser
+
+d) How could you use cat -n and grep to print the 700th line, and no other lines?
+
+Pipeline: cat -n words.txt | grep -E $'^ *700\t'
+Answer: Adirondack
+
+
+e) How do you use head and tail to find out what word is on line 200000
+
+Pipeline: tail -n+200000 words.txt | head -n1
+Answer: geodynamics's
+
+== Question 3 ==
+a) which words contain the characters "lmn" consecutively?
+
+Pipeline: grep -E lmn words.txt
+Answer:
+    Selmner
+    Selmner's
+    almner
+    almners
+    calmness
+    calmness's
+    calmnesses
+
+b) how many words contain "zz", but do not end in apostrophe-s ('s)?
+
+Pipeline: grep -E zz words.txt | grep -Ev "'s$" | wc -w
+Answer: 628
+
+c) how many words contain four consecutive vowels?
+
+Pipeline: grep -Ei '[aeiou]{4}' words.txt | wc -w
+Answer: 207
+
+d) which English words contain all 5 english vowels "aeiou" in that order?
+
+Pipeline: grep -Ei 'a.*e.*i.*o.*u' words.txt
+Answer:
+    abstemious
+    abstemiously
+    abstemiousness
+    abstemiousness's
+    abstemiousnesses
+    abstentious
+    adenocarcinomatous
+    adventitious
+    adventitiously
+    adventitiousness
+    adventitiousness's
+    adventitiousnesses
+    aeruginous
+    amentiferous
+    androdioecious
+    andromonoecious
+    anemophilous
+    antenniferous
+    antireligious
+    arenicolous
+    argentiferous
+    arsenious
+    arteriovenous
+    asclepiadaceous
+    autoecious
+    autoeciously
+    bacteriophagous
+    caesalpiniaceous
+    caesious
+    cavernicolous
+    chaetiferous
+    facetious
+    facetiously
+    facetiousness
+    facetiousness's
+    facetiousnesses
+    flagelliferous
+    garnetiferous
+    haemoglobinous
+    hamamelidaceous
+    lateritious
+    paroecious
+    quadrigeminous
+    sacrilegious
+    sacrilegiously
+    sacrilegiousness
+    sacrilegiousness's
+    sacrilegiousnesses
+    sarraceniaceous
+    supercalifragilisticexpialidocious
+    ultrareligious
+    ultraserious
+    valerianaceous
+
+e) how many English words contain all 5 english vowels "aeiou" in that order?
+
+Pipeline: grep -Ei 'a.*e.*i.*o.*u' words.txt | wc -w
+Answer: 53
+
+f) Challenge which English words contain exactly 5 vowels and the vowels are "aeiou" in that order?
+
+Pipeline: grep -Ei '^[^aeiou]*a[^aeiou]*e[^aeiou]*i[^aeiou]*o[^aeiou]*u[^aeiou]*$' words.txt
+Answer:
+    abstemious
+    abstemiously
+    abstentious
+    arsenious
+    caesious
+    facetious
+    facetiously
+
+g) How many 10+ letter lower case words which contain a 9 character lower-case word.
+
+Pipeline: grep -E '^[a-z]{10,}$' words.txt | grep -Ff words9.txt | wc -w
+Answer: 30148
+
+== Question 4 ==
+a) Write a grep command that will print all the lines in the file where the electorate begins with W.
+
+Pipeline: grep -E ', Member for W' parliament.txt
+Answer:
+    The Hon Tony Abbott, Member for Warringah
+    Mr Scott Buchholz, Member for Wright
+    The Hon Tony Burke, Member for Watson
+    Mr Nick Champion, Member for Wakefield
+    Mr Laurie Ferguson, Member for Werriwa
+    Mr Dan Tehan, Member for Wannon
+    Mr Kelvin Thomson, Member for Wills
+    The Hon Warren Truss, Member for Wide Bay
+    The Hon Malcolm Turnbull, Member for Wentworth
+
+b) Write a grep command that will list all the lines in the file where the MP's first name is Andrew.
+
+Pipeline: grep -E '((Mr|Mrs|Ms|Dr|The Hon) )+Andrew' parliament.txt
+Answer:
+    Mr Andrew Laming, Member for Bowman
+    Dr Andrew Leigh, Member for Fraser
+    The Hon Andrew Robb, Member for Goldstein
+    Dr Andrew Southcott, Member for Boothby
+    Mr Andrew Wilkie, Member for Denison
+
+c) Write a grep command that will print all the lines in the file with three consecutive vowels.
+
+Pipeline: grep -Ei '[aeiou]{3}' parliament.txt
+Answer: Mrs Louise Markus, Member for Macquarie
+
+d) Write a grep command that will print all the lines in the file where the MP's surname (last name) ends in the letter 'y'.
+
+Pipeline: grep -Ei 'y,' parliament.txt
+Answer:
+    The Hon David Bradbury, Member for Lindsay
+    Mr Michael Danby, Member for Melbourne Ports
+    The Hon Gary Gray, Member for Brand
+    The Hon Joe Hockey, Member for North Sydney
+    Mr Craig Kelly, Member for Hughes
+    The Hon Dr Mike Kelly, Member for Eden-Monaro
+    The Hon Sussan Ley, Member for Farrer
+    The Hon John Murphy, Member for Reid
+    Mr Rowan Ramsey, Member for Grey
+    Mr Wyatt Roy, Member for Longman
+    The Hon Alexander Somlyay, Member for Fairfax
+
+e) Write a grep command that will print all the lines in the file where the electorate ends in the letter 'y'.
+
+Pipeline: grep -Ei 'y$' parliament.txt
+Answer:
+    Ms Michelle Rowland, Member for Greenway
+    The Hon Wayne Swan, Member for Lilley
+    The Hon Warren Truss, Member for Wide Bay
+
+f) Write a grep command to print all the lines in the file where there is a word in the MP's name or the electorate name ending in ng.
+
+Pipeline: grep -Ei 'ng\b' parliament.txt
+Answer:
+    Mr John Alexander, Member for Bennelong
+    Mr Josh Frydenberg, Member for Kooyong
+    Mr Michael Keenan, Member for Stirling
+    The Hon Catherine King, Member for Ballarat
+    Mr Andrew Laming, Member for Bowman
+    Mr Don Randall, Member for Canning
+    The Hon Bill Shorten, Member for Maribyrnong
+
+g) Write a grep command that will print all the lines in the file where the MP's surname (last name) both begins and ends with a vowel.
+
+(Assuming all MPs have single word surnames)
+Pipeline: grep -Ei ' [aeiou][^ ]*[aeiou],' parliament.txt
+Answer: The Hon Anthony Albanese, Member for Grayndler
+
+h) Write a grep command that will print all the lines in the file where the electorate name contains multiple words (separated by spaces or hyphens).
+
+Pipeline: grep -E ', Member for [^ -]+[ -][^ -]' parliament.txt
+Answer:
+    The Hon Mark Butler, Member for Port Adelaide
+    Mr Michael Danby, Member for Melbourne Ports
+    The Hon Peter Garrett, Member for Kingsford Smith
+    The Hon Joe Hockey, Member for North Sydney
+    The Hon Dr Mike Kelly, Member for Eden-Monaro
+    Ms Laura Smyth, Member for La Trobe
+    The Hon Warren Truss, Member for Wide Bay
+    Mr Tony Windsor, Member for New England
+
+== Question 5 ==
+
+Write a shell pipline which prints the 2nd most common MP first name.
+
+(Assuming all MPs have single word first names)
+Pipeline: sed -E 's/^((Mr|Mrs|Ms|Dr|The Hon) )+//gm' parliament.txt | cut -d' ' -f1 | sort | uniq -c | sort -rn | awk 'NR == 2 {print $2}'
+Answer: Andrew
+
+== Question 6 ==
+a) How many total classes are there?
+
+Pipeline: wc -l classes
+Answer: 316
+
+b) How many different courses have classes?
+
+Pipeline: cut -f1 classes.txt | sort -u | wc -l
+Answer: 42
+
+c) Write a pipeline which will print the course with the most classes?
+
+Pipeline: cut -f1 classes.txt | sort | uniq -c | sort -rn | awk 'NR == 1 {print $2}'
+Answer: ENGG1811
+
+d) Give a command line that prints the most frequently-used tut room?
+
+Pipeline: awk -F$'\t' '$3 == "TUT" || $3 == "TLB" {print $5}' classes.txt | sort | uniq -c | sort -rn | awk 'NR == 1 {print $2, $3}'
+Answer: Quad G040
+
+e) Give a command line that prints the most popular time-of-day for tutes?
+
+Pipeline: awk -F$'\t' '$3 == "TUT" || $3 == "TLB" {print $4}' classes.txt | cut -d' ' -f2 | cut -d'-' -f1 | sort | uniq -c | sort -rn | awk 'NR == 1 {print $2}'
+Answer: 14
+
+f) Which COMP courses run the most simultaneous classes of the same type?
+
+Pipeline:
+    cut -f1,3,4 classes.txt | sort | uniq -c | awk "$(cat <<'EOF'
+    {
+        if ($1 > max) {
+            max = $1;
+            line = $2;
+        } else if ($1 == max) {
+            line = line "\n" $2;
+        }
+    } END {
+        print line
+    }
+    EOF
+    )"
+
+Answer:
+    COMP9414
+    COMP9814
+
+g) Write a pipeline that prints list of the course names (only) of COMP courses that run simultaneous classes of the same type?
+
+Pipeline: awk -F$'\t' '$1 ~ /^COMP/ {print $1,$3,$4}' classes.txt | sort | uniq -c | awk '$1 > 1 {print $2}' | sort -u
+Answer:
+    COMP0011
+    COMP1911
+    COMP1917
+    COMP1927
+    COMP2911
+    COMP3141
+    COMP3411
+    COMP4511
+    COMP9318
+    COMP9321
+    COMP9332
+    COMP9333
+    COMP9414
+    COMP9814
+
+== Question 7 (Challenge) ==
+a) Match any line containing at least one A and at least one B.
+
+Regexp:　A.*B|B.*A
+
+b) Match any line any line containing only the characters A and B such that all pairs of adjacent As occur before any pairs of adjacent Bs
+
+Regexp: ^A*(BA+)*(B+A)*B*$
+
+c) Match any line containing  only the characters A and B such that all number of A's is divisible by 4.
+
+Regexp: ^((B*A){4})*B*$
+
+d) Match any line containing n As followed by n Bs and no other characters..
+
+Not matchable by extended regex, but matchable by PCRE: ^(A(?1)?B)$
+Regexp/script:
+    #!/bin/bash
+
+    while LINE=$(grep -Em1 ''); do # Not allowed to use `read` nor `readarray` mumble mumble
+        if ! grep -Eq '^A*B*$' <<< $LINE; then
+            continue
+        fi
+
+        PARTS=($(sed -E 's/AB/A B/' <<< $LINE))
+        if test ${#PARTS[0]} -eq ${#PARTS[1]}; then
+            echo $LINE
+        fi
+    done
