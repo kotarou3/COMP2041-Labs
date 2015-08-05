@@ -4,10 +4,15 @@ a) What word is on line 2000
 Less keystrokes: 2000g
 Word: Algonquian
 
-b) the first word in the dictionary file ending with 's
+b old) the first word in the dictionary file ending with 's
 
 Less keystrokes: /'s$<ENTER>
 Word: A's
+
+b new) the first word in the dictionary file ending with z
+
+Less keystrokes: /z$<ENTER>
+Word: Abkhaz
 
 c) the last word in the dictionary that contains the substring ooz ?
 
@@ -143,7 +148,9 @@ Answer:
 g) How many 10+ letter lower case words which contain a 9 character lower-case word.
 
 Pipeline: grep -E '^[a-z]{10,}$' words.txt | grep -Ff words9.txt | wc -w
-Answer: 30148
+Answer:
+    30148 (including diacritic marks (LC_ALL=en_AU.UTF-8))
+    30117 (excluding diacritic marks (LC_ALL=C))
 
 == Question 4 ==
 a) Write a grep command that will print all the lines in the file where the electorate begins with W.
