@@ -87,6 +87,6 @@ runTest 20 40000 &
 sleep 1
 for N in $(seq 5); do
     echo
-    wait -n
+    wait "$(jobs -p | head -n1)"
 done
 trap - EXIT
