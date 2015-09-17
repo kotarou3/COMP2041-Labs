@@ -227,7 +227,7 @@ word             : WORD
                  | ASSIGNMENT_WORD
                  | NAME
                  ;
-word_or_operator : word
+word_or_reserved : word
                  | If
                  | Then
                  | Else
@@ -316,9 +316,9 @@ cmd_suffix       :            io_redirect
                      {error($ARG[0], "IO redirection currently unsupported");}
                  | cmd_suffix io_redirect
                      {error($ARG[0], "IO redirection currently unsupported");}
-                 |            word_or_operator
+                 |            word_or_reserved
                      {{"args" => [$ARG[1]]}}
-                 | cmd_suffix word_or_operator
+                 | cmd_suffix word_or_reserved
                      {push $ARG[1]->{"args"}, $ARG[2]; $ARG[1];}
                  ;
 redirect_list    :               io_redirect
