@@ -22,10 +22,12 @@ sub dumpParsedSh {
             return;
         }
 
-        Bless($node)->keys([grep {$node->{$_}} qw(type value children assignment command args)]);
+        Bless($node)->keys([grep {$node->{$_}} qw(type value children var in comments action assignment command args)]);
 
         if ($node->{"value"}) {
             doBless($node->{"value"});
+        } elsif ($node->{"action"}) {
+            doBless($node->{"action"});
         } elsif ($node->{"children"}) {
             foreach my $child (@{$node->{"children"}}) {
                 doBless($child);
@@ -44,6 +46,9 @@ foreach my $file (@ARGV) {
             or die "could not open $file: $!";
         <$fh>;
     };
+    if (!($document =~ /\n$/)) {
+        $document .= "\n";
+    }
 
     my $parser = new ShPyParser;
     $parser->YYData->{"DATA"} = $document;

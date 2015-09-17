@@ -170,32 +170,19 @@
 /* -------------------------------------------------------
    The Grammar
    ------------------------------------------------------- */
-%start file
+%start list
 %%
-file             : file line
-                     {appendNode($ARG[1], $ARG[2]);}
-                 |      line
-                     {createNode("file", $ARG[1]);}
-                 ;
-line             : complete_command
-                 | newline_list
-                 ;
-complete_command : list separator
-                     {createNode("complete_command", $ARG[1], $ARG[2]);}
-                 | list
-                     {createNode("complete_command", $ARG[1]);}
-                 ;
-list             : list separator_op and_or
-                     {appendNode($ARG[1], $ARG[3]);}
-                 |                   and_or
-                     {createNode("list", $ARG[1]);}
+list             : linebreak and_or separator
+                     {createNode("list", $ARG[1], $ARG[2], $ARG[3]);}
+                 | list and_or separator
+                     {appendNode($ARG[1], $ARG[2], $ARG[3]);}
                  ;
 and_or           :                         pipeline
                      {createNode("and_or", $ARG[1]);}
                  | and_or AND_IF linebreak pipeline
-                     {createNode("and_or", $ARG[1], $ARG[2], $ARG[4]);}
+                     {createNode("and_or", $ARG[1], $ARG[2], $ARG[3], $ARG[4]);}
                  | and_or OR_IF  linebreak pipeline
-                     {createNode("and_or", $ARG[1], $ARG[2], $ARG[4]);}
+                     {createNode("and_or", $ARG[1], $ARG[2], $ARG[3], $ARG[4]);}
                  ;
 pipeline         :      pipe_sequence
                      {$ARG[1];}
@@ -210,26 +197,25 @@ pipe_sequence    :                             command
 command          : simple_command
                      {createLeaf("simple_command", $ARG[1]);}
                  | compound_command
-                     {error($ARG[0], "Compound commands currently unsupported");}
+                     {createLeaf("compound_command", $ARG[1]);}
                  | compound_command redirect_list
-                     {error($ARG[0], "Compound commands currently unsupported");}
+                     {error($ARG[0], "IO redirection currently unsupported");}
                  ;
 compound_command : for_clause
+                     {createLeaf("for", $ARG[1]);}
                  | case_clause
+                     {die("case clause current unsupported");}
                  | if_clause
+                     {die("if clause current unsupported");}
                  | while_clause
-                 ;
-compound_list    :              term
-                 | newline_list term
-                 |              term separator
-                 | newline_list term separator
-                 ;
-term             : term separator and_or
-                 |                and_or
+                     {die("while clause current unsupported");}
                  ;
 for_clause       : For name linebreak                            do_group
+                     {{"var" => $ARG[2], "in" => ["\$@"], "action" => $ARG[4]};}
                  | For name linebreak in          sequential_sep do_group
+                     {{"var" => $ARG[2], "in" => [], "comments" => $ARG[5], "action" => $ARG[6]};}
                  | For name linebreak in wordlist sequential_sep do_group
+                     {{"var" => $ARG[2], "in" => $ARG[5], "comments" => $ARG[6], "action" => $ARG[7]};}
                  ;
 name             : NAME                     /* Apply rule 5 */
                  ;
@@ -255,7 +241,9 @@ word_or_operator : word
                  | In
                  ;
 wordlist         : wordlist word
+                     {push $ARG[1], $ARG[2]; $ARG[1];}
                  |          word
+                     {[$ARG[1]];}
                  ;
 case_clause      : Case word linebreak in linebreak case_list    Esac
                  | Case word linebreak in linebreak case_list_ns Esac
@@ -267,29 +255,30 @@ case_list_ns     : case_list case_item_ns
 case_list        : case_list case_item
                  |           case_item
                  ;
-case_item_ns     :     pattern ')'               linebreak
-                 |     pattern ')' compound_list linebreak
-                 | '(' pattern ')'               linebreak
-                 | '(' pattern ')' compound_list linebreak
+case_item_ns     :     pattern ')'      linebreak
+                 |     pattern ')' list linebreak
+                 | '(' pattern ')'      linebreak
+                 | '(' pattern ')' list linebreak
                  ;
-case_item        :     pattern ')' linebreak     DSEMI linebreak
-                 |     pattern ')' compound_list DSEMI linebreak
-                 | '(' pattern ')' linebreak     DSEMI linebreak
-                 | '(' pattern ')' compound_list DSEMI linebreak
+case_item        :     pattern ')' linebreak DSEMI linebreak
+                 |     pattern ')' list      DSEMI linebreak
+                 | '(' pattern ')' linebreak DSEMI linebreak
+                 | '(' pattern ')' list      DSEMI linebreak
                  ;
 pattern          :             word         /* Apply rule 4 */
                  | pattern '|' word         /* Do not apply rule 4 */
                  ;
-if_clause        : If compound_list Then compound_list else_part Fi
-                 | If compound_list Then compound_list           Fi
+if_clause        : If list Then list else_part Fi
+                 | If list Then list           Fi
                  ;
-else_part        : Elif compound_list Then compound_list else_part
-                 | Elif compound_list Then compound_list
-                 | Else compound_list
+else_part        : Elif list Then list else_part
+                 | Elif list Then list
+                 | Else list
                  ;
-while_clause     : While compound_list do_group
+while_clause     : While list do_group
                  ;
-do_group         : Do compound_list Done           /* Apply rule 6 */
+do_group         : Do list Done           /* Apply rule 6 */
+                     {$ARG[2];}
                  ;
 simple_command   : cmd_prefix cmd_word cmd_suffix
                      {mergeCommand($ARG[1], $ARG[3], {"command" => $ARG[2]});}
@@ -361,6 +350,7 @@ separator        : separator_op linebreak
                  | newline_list
                  ;
 sequential_sep   : ';' linebreak
+                     {$ARG[3];}
                  | newline_list
                  ;
 %%
