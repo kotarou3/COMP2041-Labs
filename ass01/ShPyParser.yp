@@ -352,11 +352,11 @@ separator_op     : '&'
                  | ';'
                  ;
 separator        : separator_op linebreak
-                     {$ARG[3];}
+                     {$ARG[2];}
                  | newline_list
                  ;
 sequential_sep   : ';' linebreak
-                     {$ARG[3];}
+                     {$ARG[2];}
                  | newline_list
                  ;
 %%
