@@ -208,7 +208,7 @@ compound_command : for_clause
                  | if_clause
                      {createLeaf("if", $ARG[1]);}
                  | while_clause
-                     {die("while clause current unsupported");}
+                     {createLeaf("while", $ARG[1]);}
                  ;
 for_clause       : For name linebreak                            do_group
                      {{"var" => $ARG[2], "in" => ["\$@"], "action" => $ARG[4]};}
@@ -281,6 +281,7 @@ else_part        : Elif list Then list else_part
                      {$ARG[2];}
                  ;
 while_clause     : While list do_group
+                     {{"condition" => $ARG[2], "then" => $ARG[3]};}
                  ;
 do_group         : Do list Done           /* Apply rule 6 */
                      {$ARG[2];}
