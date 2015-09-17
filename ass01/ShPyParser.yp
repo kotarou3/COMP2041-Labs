@@ -210,8 +210,10 @@ compound_command : for_clause
                  | while_clause
                      {createLeaf("while", $ARG[1]);}
                  ;
-for_clause       : For name linebreak                            do_group
-                     {{"var" => $ARG[2], "in" => ["\$@"], "action" => $ARG[4]};}
+for_clause       : For name                                      do_group
+                     {{"var" => $ARG[2], "in" => ["\$@"], "action" => $ARG[3]};}
+                 | For name                       sequential_sep do_group
+                     {{"var" => $ARG[2], "in" => ["\$@"], "comments" => $ARG[3], "action" => $ARG[4]};}
                  | For name linebreak in          sequential_sep do_group
                      {{"var" => $ARG[2], "in" => [], "comments" => $ARG[5], "action" => $ARG[6]};}
                  | For name linebreak in wordlist sequential_sep do_group
