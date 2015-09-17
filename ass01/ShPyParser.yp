@@ -206,7 +206,7 @@ compound_command : for_clause
                  | case_clause
                      {die("case clause current unsupported");}
                  | if_clause
-                     {die("if clause current unsupported");}
+                     {createLeaf("if", $ARG[1]);}
                  | while_clause
                      {die("while clause current unsupported");}
                  ;
@@ -269,11 +269,16 @@ pattern          :             word         /* Apply rule 4 */
                  | pattern '|' word         /* Do not apply rule 4 */
                  ;
 if_clause        : If list Then list else_part Fi
+                     {{"condition" => $ARG[2], "then" => $ARG[4], "else" => $ARG[5]};}
                  | If list Then list           Fi
+                     {{"condition" => $ARG[2], "then" => $ARG[4]};}
                  ;
 else_part        : Elif list Then list else_part
+                     {{"condition" => $ARG[2], "then" => $ARG[4], "else" => $ARG[5]};}
                  | Elif list Then list
+                     {{"condition" => $ARG[2], "then" => $ARG[4]};}
                  | Else list
+                     {$ARG[2];}
                  ;
 while_clause     : While list do_group
                  ;

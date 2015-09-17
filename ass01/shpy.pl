@@ -22,15 +22,29 @@ sub dumpParsedSh {
             return;
         }
 
-        Bless($node)->keys([grep {$node->{$_}} qw(type value children var in comments action assignment command args)]);
+        Bless($node)->keys([grep {$node->{$_}} qw(
+            type
+            value
+            children
+            var
+            in
+            comments
+            action
+            condition
+            then
+            else
+            assignment
+            command
+            args
+        )]);
 
-        if ($node->{"value"}) {
-            doBless($node->{"value"});
-        } elsif ($node->{"action"}) {
-            doBless($node->{"action"});
-        } elsif ($node->{"children"}) {
+        if ($node->{"children"}) {
             foreach my $child (@{$node->{"children"}}) {
                 doBless($child);
+            }
+        } else {
+            foreach my $key (keys %$node) {
+                doBless($node->{$key});
             }
         }
     }
