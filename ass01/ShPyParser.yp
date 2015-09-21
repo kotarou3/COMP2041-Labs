@@ -11,7 +11,7 @@
         my $token = "";
 
         while (length $ARG[0]->YYData->{"DATA"} > 0) {
-            $ARG[0]->YYData->{"DATA"} =~ s/^([^ \t\n|;&\\'"]+)// and $token .= $1;
+            $ARG[0]->YYData->{"DATA"} =~ s/^([^ \t\n|;&()\\'"]+)// and $token .= $1;
             my $nextChar = substr($ARG[0]->YYData->{"DATA"}, 0, 1);
             if ($nextChar eq "\\") {
                 $nextChar = substr($ARG[0]->YYData->{"DATA"}, 1, 1);
@@ -170,12 +170,18 @@
 /* -------------------------------------------------------
    The Grammar
    ------------------------------------------------------- */
-%start list
+%start list_opt_sep
 %%
-list             : linebreak and_or separator
-                     {createNode("list", $ARG[1], $ARG[2], $ARG[3]);}
-                 | list and_or separator
+list_no_sep      : linebreak and_or
+                     {createNode("list", $ARG[1], $ARG[2]);}
+                 | list_no_sep separator and_or
                      {appendNode($ARG[1], $ARG[2], $ARG[3]);}
+                 ;
+list             : list_no_sep separator
+                     {appendNode($ARG[1], $ARG[2]);}
+                 ;
+list_opt_sep     : list
+                 | list_no_sep
                  ;
 and_or           :                         pipeline
                      {createNode("and_or", $ARG[1]);}
@@ -204,7 +210,7 @@ command          : simple_command
 compound_command : for_clause
                      {createLeaf("for", $ARG[1]);}
                  | case_clause
-                     {die("case clause current unsupported");}
+                     {createLeaf("case", $ARG[1]);}
                  | if_clause
                      {createLeaf("if", $ARG[1]);}
                  | while_clause
@@ -248,27 +254,59 @@ wordlist         : wordlist word
                      {[$ARG[1]];}
                  ;
 case_clause      : Case word linebreak in linebreak case_list    Esac
+                     {
+                         push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
+                         {"word" => $ARG[2], "comments" => $ARG[3], "cases" => $ARG[6]};
+                     }
                  | Case word linebreak in linebreak case_list_ns Esac
+                     {
+                         push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
+                         {"word" => $ARG[2], "comments" => $ARG[3], "cases" => $ARG[6]};
+                     }
                  | Case word linebreak in linebreak              Esac
+                     {
+                         push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
+                         {"word" => $ARG[2], "comments" => $ARG[3]};
+                     }
                  ;
 case_list_ns     : case_list case_item_ns
+                     {push $ARG[1], $ARG[2]; $ARG[1];}
                  |           case_item_ns
+                     {[$ARG[1]];}
                  ;
 case_list        : case_list case_item
+                     {push $ARG[1], $ARG[2]; $ARG[1];}
                  |           case_item
+                     {[$ARG[1]];}
                  ;
 case_item_ns     :     pattern ')'      linebreak
+                     {{"case" => $ARG[1], "comments" => $ARG[3]};}
                  |     pattern ')' list linebreak
+                     {{"case" => $ARG[1], "action" => $ARG[3], "comments" => $ARG[4]};}
                  | '(' pattern ')'      linebreak
+                     {{"case" => $ARG[2], "comments" => $ARG[4]};}
                  | '(' pattern ')' list linebreak
+                     {{"case" => $ARG[2], "action" => $ARG[4], "comments" => $ARG[5]};}
                  ;
-case_item        :     pattern ')' linebreak DSEMI linebreak
-                 |     pattern ')' list      DSEMI linebreak
-                 | '(' pattern ')' linebreak DSEMI linebreak
-                 | '(' pattern ')' list      DSEMI linebreak
+case_item        :     pattern ')' linebreak    DSEMI linebreak
+                     {
+                         push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
+                         {"case" => $ARG[1], "comments" => $ARG[3]};
+                     }
+                 |     pattern ')' list_opt_sep DSEMI linebreak
+                     {{"case" => $ARG[1], "action" => $ARG[3], "comments" => $ARG[5]};}
+                 | '(' pattern ')' linebreak    DSEMI linebreak
+                     {
+                         push($ARG[4]->{"children"}, @{$ARG[6]->{"children"}});
+                         {"case" => $ARG[2], "comments" => $ARG[4]};
+                     }
+                 | '(' pattern ')' list_opt_sep DSEMI linebreak
+                     {{"case" => $ARG[2], "action" => $ARG[4], "comments" => $ARG[6]};}
                  ;
 pattern          :             word         /* Apply rule 4 */
+                     {[$ARG[1]];}
                  | pattern '|' word         /* Do not apply rule 4 */
+                     {push $ARG[1], $ARG[2]; $ARG[1];}
                  ;
 if_clause        : If list Then list else_part Fi
                      {{"condition" => $ARG[2], "then" => $ARG[4], "else" => $ARG[5]};}
@@ -349,6 +387,7 @@ newline_list     :              newline
                  ;
 linebreak        : newline_list
                  | /* empty */
+                     {createNode("newline_list");}
                  ;
 separator_op     : '&'
                  | ';'

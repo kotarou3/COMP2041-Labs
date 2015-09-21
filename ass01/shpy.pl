@@ -18,7 +18,12 @@ sub dumpParsedSh {
     sub doBless {
         my ($node) = @ARG;
 
-        if (ref($node) ne "HASH") {
+        if (ref($node) eq "ARRAY") {
+            foreach my $elem (@$node) {
+                doBless($elem);
+            }
+            return;
+        } elsif (ref($node) ne "HASH") {
             return;
         }
 
@@ -27,8 +32,11 @@ sub dumpParsedSh {
             value
             children
             var
+            word
             in
             comments
+            cases
+            case
             action
             condition
             then
@@ -60,9 +68,6 @@ foreach my $file (@ARGV) {
             or die "could not open $file: $!";
         <$fh>;
     };
-    if (!($document =~ /\n$/)) {
-        $document .= "\n";
-    }
 
     my $parser = new ShPyParser;
     $parser->YYData->{"DATA"} = $document;
