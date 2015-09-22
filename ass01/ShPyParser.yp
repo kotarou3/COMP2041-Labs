@@ -22,7 +22,8 @@
                 if ($ARG[0]->YYData->{"DATA"} =~ s/^('[^']+')//) {
                     $token .= $1;
                 } else {
-                    die "unexpected EOF while looking for matching `''\n";
+                    error($ARG[0], "unexpected EOF while looking for matching `''");
+                    return $token;
                 }
             } elsif ($nextChar eq "\"") {
                 if ($ARG[0]->YYData->{"DATA"} =~ s/^("(?:\\[\$`"\\\n]?|[^"])*")//) {
@@ -30,7 +31,8 @@
                     $match =~ s/\\\n//g;
                     $token .= $match;
                 } else {
-                    die "unexpected EOF while looking for matching `\"'\n";
+                    error($ARG[0], "unexpected EOF while looking for matching `\"'");
+                    return $token;
                 }
             } else {
                 return $token;
