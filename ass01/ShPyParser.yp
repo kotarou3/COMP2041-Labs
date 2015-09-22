@@ -8,87 +8,174 @@
     use Switch;
 
     sub getNextToken {
-        my $token = "";
+        # Could use a trie for this, but too much effort
+        # Could also use a regex, but is harder to maintain
+        my @delimiters = ({
+            # Single character delimiters
+            " " => "SPACE",
+            "\t" => "SPACE",
+            "\n" => "NEWLINE",
+            "#" => "SL_COMMENT",
+            "\\" => "ESCAPE",
+            "'" => "SQUOTE",
+            "\"" => "DQUOTE",
+            "|" => "|",
+            ";" => ";",
+            "&" => "&",
+            "(" => "(",
+            ")" => ")",
+            ">" => ">",
+            "<" => "<"
+        }, {
+            # Two character delimiters
+            "&&" => "AND_IF",
+            "||" => "OR_IF",
+            ";;" => "DSEMI",
+            "<<" => "DLESS",
+            ">>" => "DGREAT",
+            "<>" => "LESSGREAT"
+        });
 
-        while (length $ARG[0]->YYData->{"DATA"} > 0) {
-            $ARG[0]->YYData->{"DATA"} =~ s/^([^ \t\n|;&()\\'"]+)// and $token .= $1;
-            my $nextChar = substr($ARG[0]->YYData->{"DATA"}, 0, 1);
-            if ($nextChar eq "\\") {
-                $nextChar = substr($ARG[0]->YYData->{"DATA"}, 1, 1);
-                if ($nextChar ne "\n") {
-                    $token .= "\\" . $nextChar;
+        # Find the next delimiter
+        my ($nextDelim, $nextDelimType, $nextDelimIndex);
+        $nextDelimIndex = length $ARG[0]->YYData->{"DATA"};
+        if ($ARG[0]->YYData->{"DATA"} =~ /(\$(?:\\\n)?(?:[-@*#?\$!0-9]|[a-z_](?:\\\n|[a-z0-9_])*))/i) {
+            # Special case for $variables, since they are treated as normal text if the name isn't valid
+            $nextDelim = $1;
+            $nextDelimType = "VARIABLE";
+            $nextDelimIndex = $-[1];
+        }
+    findDelim:
+        for (my $c = 0; $c < $nextDelimIndex; ++$c) {
+            # Escaped newlines are interpreted as if they didn't exist except when in comments
+            # e.g., They can be placed inside a two-character delimiter (copies bash's behavior)
+            while (substr($ARG[0]->YYData->{"DATA"}, $c, 3) =~ s/^(?:[^\\#]\K)?\\\n//) {
+                $nextDelimIndex -= 2;
+            }
+
+            for (my $delimLength = scalar @delimiters; $delimLength > 0; --$delimLength) {
+                my $substr = substr($ARG[0]->YYData->{"DATA"}, $c, $delimLength);
+                if ($delimiters[$delimLength - 1]->{$substr}) {
+                    $nextDelim = $substr;
+                    $nextDelimType = $delimiters[$delimLength - 1]->{$substr};
+                    $nextDelimIndex = $c;
+                    last findDelim;
                 }
-            } elsif ($nextChar eq "'") {
-                if ($ARG[0]->YYData->{"DATA"} =~ s/^('[^']+')//) {
-                    $token .= $1;
-                } else {
-                    error($ARG[0], "unexpected EOF while looking for matching `''");
-                    return $token;
-                }
-            } elsif ($nextChar eq "\"") {
-                if ($ARG[0]->YYData->{"DATA"} =~ s/^("(?:\\[\$`"\\\n]?|[^"])*")//) {
-                    my $match = $1;
-                    $match =~ s/\\\n//g;
-                    $token .= $match;
-                } else {
-                    error($ARG[0], "unexpected EOF while looking for matching `\"'");
-                    return $token;
-                }
-            } else {
-                return $token;
             }
         }
 
-        return $token;
+        if ($nextDelimIndex != 0) {
+            # Another special case for variable assignments, with same reason as above
+            $ARG[0]->YYData->{"DATA"} =~ s/^([a-z_][a-z0-9_]*)=//i and return ("VARIABLE_ASSIGNMENT", $1);
+
+            # Delimiter isn't immediately next, so return the bit in between
+            my $token = substr($ARG[0]->YYData->{"DATA"}, 0, $nextDelimIndex, "");
+
+            # Check for reserved words
+            my $type;
+            switch ($token) {
+                case "if" {$type = "If";}
+                case "then" {$type = "Then";}
+                case "else" {$type = "Else";}
+                case "elif" {$type = "Elif";}
+                case "fi" {$type = "Fi";}
+                case "do" {$type = "Do";}
+                case "done" {$type = "Done";}
+                case "case" {$type = "Case";}
+                case "esac" {$type = "Esac";}
+                case "while" {$type = "While";}
+                case "for" {$type = "For";}
+                case "!" {$type = "Bang";}
+                case "in" {$type = "In";}
+                case m/^[a-z_][a-z0-9_]*$/i {$type = "NAME";}
+                else {$type = "WORD";}
+            }
+
+            return ($type, $token);
+        } elsif ($nextDelimType eq "SL_COMMENT") {
+            # Comments go until the end of the line
+            $ARG[0]->YYData->{"DATA"} =~ s/^(#.*)// and return ("SL_COMMENT", $1);
+            die("Should never happen");
+        } elsif ($nextDelimType eq "VARIABLE") {
+            # Since a variable token is detected before the escaped newline removal, they have to be manually removed
+            substr($ARG[0]->YYData->{"DATA"}, 0, length $nextDelim, "");
+            $nextDelim =~ s/\\\n//g;
+            return ("VARIABLE", substr($nextDelim, 1)); # Don't include the $
+        } elsif ($nextDelimType eq "ESCAPE") {
+            # If the stream ends before the escaped character, return nothing (not specified by POSIX, but is bash's behaviour)
+            $ARG[0]->YYData->{"DATA"} =~ s/^\\(.)// and return ("ESCAPED", $1);
+            $ARG[0]->YYData->{"DATA"} =~ /^\\\n/ and die("Should never happen");
+            return ("", undef);
+        } elsif ($nextDelimType eq "SQUOTE") {
+            # Single quotes includes everything until the next single quote
+            $ARG[0]->YYData->{"DATA"} =~ s/^'([^']*)'// and return ("WORD_SQUOTED", $1);
+            error($ARG[0], "unexpected EOF while looking for matching `''");
+            return ("", undef);
+        } elsif ($nextDelimType eq "DQUOTE") {
+            error($ARG[0], "Double quotes are currently not supported");
+            return ("", undef);
+        } elsif ($nextDelimType eq "SPACE") {
+            die("Should never happen");
+        } else {
+            substr($ARG[0]->YYData->{"DATA"}, 0, length $nextDelim, "");
+            return ($nextDelimType, $nextDelim);
+        }
     }
 
     sub Lexer {
-        $ARG[0]->YYData->{"DATA"} =~ s/^[ \t]+//;
+        my %wordTokenTypes = (
+            "NAME" => 1,
+            "WORD" => 1,
+            "WORD_SQUOTED" => 1,
+            "WORD_DQUOTED" => 1,
+            "VARIABLE" => 1,
+            "VARIABLE_ASSIGNMENT" => 1,
+            "ESCAPED" => 1,
+            "If" => 1,
+            "Then" => 1,
+            "Else" => 1,
+            "Elif" => 1,
+            "Fi" => 1,
+            "Do" => 1,
+            "Done" => 1,
+            "Case" => 1,
+            "Esac" => 1,
+            "While" => 1,
+            "For" => 1,
+            "Bang" => 1,
+            "In" => 1
+        );
+
+        if (!$ARG[0]->YYData->{"queuedTokens"}) {
+            $ARG[0]->YYData->{"queuedTokens"} = [];
+        }
+        if (scalar @{$ARG[0]->YYData->{"queuedTokens"}}) {
+            return @{shift(@{$ARG[0]->YYData->{"queuedTokens"}})};
+        }
+
+        # Whitespace is ignored (outside of quotes)
+        $ARG[0]->YYData->{"DATA"} =~ s/^([ \t]+)//;
+        my $removedLeadingWhitespace = $1;
+
         if (length $ARG[0]->YYData->{"DATA"} == 0) {
             return ("", undef);
         }
 
-        $ARG[0]->YYData->{"DATA"} =~ s/^(\n)// and return ("NEWLINE", $1);
-        $ARG[0]->YYData->{"DATA"} =~ s/^(#.*)// and return ("SL_COMMENT", $1);
-        $ARG[0]->YYData->{"DATA"} =~ s/^(&&)// and return ("AND_IF", $1);
-        $ARG[0]->YYData->{"DATA"} =~ s/^(\|\|)// and return ("OR_IF", $1);
-        $ARG[0]->YYData->{"DATA"} =~ s/^(;;)// and return ("DSEMI", $1);
-        $ARG[0]->YYData->{"DATA"} =~ s/^(>>)// and return ("DGREAT", $1);
-        $ARG[0]->YYData->{"DATA"} =~ s/^(<&)// and return ("LESSAND", $1);
-        $ARG[0]->YYData->{"DATA"} =~ s/^(>&)// and return ("GREATAND", $1);
-        $ARG[0]->YYData->{"DATA"} =~ s/^(<>)// and return ("LESSGREAT", $1);
+        my ($tokenType, $tokenValue) = getNextToken($ARG[0]);
 
-        my $token = getNextToken($ARG[0]);
-        if (length $token == 0) {
-            if (length $ARG[0]->YYData->{"DATA"} == 0) {
-                return ("", undef);
+        # If this is the second "word" type token in a row, insert a WORD_CONTINUATION in between
+        if ($wordTokenTypes{$tokenType}) {
+            if (!$removedLeadingWhitespace && $ARG[0]->YYData->{"isInWord"}) {
+                push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$tokenType, $tokenValue]);
+                return ("WORD_CONTINUATION", "");
             } else {
-                $ARG[0]->YYData->{"DATA"} =~ s/^(.)//;
-                return ($1, $1);
+                $ARG[0]->YYData->{"isInWord"} = 1;
             }
+        } else {
+            $ARG[0]->YYData->{"isInWord"} = 0;
         }
 
-        my $type;
-        switch ($token) {
-            case "if" {$type = "If";}
-            case "then" {$type = "Then";}
-            case "else" {$type = "Else";}
-            case "elif" {$type = "Elif";}
-            case "fi" {$type = "Fi";}
-            case "do" {$type = "Do";}
-            case "done" {$type = "Done";}
-            case "case" {$type = "Case";}
-            case "esac" {$type = "Esac";}
-            case "while" {$type = "While";}
-            case "for" {$type = "For";}
-            case "!" {$type = "Bang";}
-            case "in" {$type = "In";}
-            case /[a-z][a-z0-9]*=/ {$type = "ASSIGNMENT_WORD";}
-            case /[a-z][a-z0-9]*/ {$type = "NAME";}
-            else {$type = "WORD";}
-        }
-
-        return ($type, $token);
+        return ($tokenType, $tokenValue);
     }
 
     sub createNode {
@@ -134,19 +221,24 @@
    The grammar symbols
    ------------------------------------------------------- */
 %token  WORD
-%token  ASSIGNMENT_WORD
+%token  WORD_SQUOTED
+%token  WORD_CONTINUATION
 %token  NAME
 %token  NEWLINE
-%token  IO_NUMBER
 %token  SL_COMMENT
+
+%token  HERE_STRING
+%token  VARIABLE
+%token  VARIABLE_ASSIGNMENT
+%token  ESCAPED
 
 /* The following are the operators mentioned above. */
 
 %token  AND_IF    OR_IF    DSEMI
 /*      '&&'      '||'     ';;'    */
 
-%token  DGREAT  LESSAND  GREATAND  LESSGREAT
-/*      '>>'    '<&'     '>&'      '<>'      */
+%token  DLESS  DGREAT  LESSGREAT
+/*      '<<'   '>>'    '<>'      */
 
 
 /* The following are the reserved words. */
@@ -174,7 +266,7 @@
    ------------------------------------------------------- */
 %start list_opt_sep
 %%
-list_no_sep      : linebreak and_or
+list_no_sep      :             linebreak and_or
                      {createNode("list", $ARG[1], $ARG[2]);}
                  | list_no_sep separator and_or
                      {appendNode($ARG[1], $ARG[2], $ARG[3]);}
@@ -218,54 +310,26 @@ compound_command : for_clause
                  | while_clause
                      {createLeaf("while", $ARG[1]);}
                  ;
-for_clause       : For name                                      do_group
+for_clause       : For NAME                                      do_group
                      {{"var" => $ARG[2], "in" => ["\$@"], "action" => $ARG[3]};}
-                 | For name                       sequential_sep do_group
+                 | For NAME                       sequential_sep do_group
                      {{"var" => $ARG[2], "in" => ["\$@"], "comments" => $ARG[3], "action" => $ARG[4]};}
-                 | For name linebreak in          sequential_sep do_group
+                 | For NAME linebreak In          sequential_sep do_group
                      {{"var" => $ARG[2], "in" => [], "comments" => $ARG[5], "action" => $ARG[6]};}
-                 | For name linebreak in wordlist sequential_sep do_group
+                 | For NAME linebreak In wordlist sequential_sep do_group
                      {{"var" => $ARG[2], "in" => $ARG[5], "comments" => $ARG[6], "action" => $ARG[7]};}
                  ;
-name             : NAME                     /* Apply rule 5 */
-                 ;
-in               : In                       /* Apply rule 6 */
-                 ;
-word             : WORD
-                 | ASSIGNMENT_WORD
-                 | NAME
-                 ;
-word_or_reserved : word
-                 | If
-                 | Then
-                 | Else
-                 | Elif
-                 | Fi
-                 | Do
-                 | Done
-                 | Case
-                 | Esac
-                 | While
-                 | For
-                 | Bang
-                 | In
-                 ;
-wordlist         : wordlist word
-                     {push $ARG[1], $ARG[2]; $ARG[1];}
-                 |          word
-                     {[$ARG[1]];}
-                 ;
-case_clause      : Case word linebreak in linebreak case_list    Esac
+case_clause      : Case word linebreak In linebreak case_list    Esac
                      {
                          push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
                          {"word" => $ARG[2], "comments" => $ARG[3], "cases" => $ARG[6]};
                      }
-                 | Case word linebreak in linebreak case_list_ns Esac
+                 | Case word linebreak In linebreak case_list_ns Esac
                      {
                          push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
                          {"word" => $ARG[2], "comments" => $ARG[3], "cases" => $ARG[6]};
                      }
-                 | Case word linebreak in linebreak              Esac
+                 | Case word linebreak In linebreak              Esac
                      {
                          push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
                          {"word" => $ARG[2], "comments" => $ARG[3]};
@@ -305,9 +369,9 @@ case_item        :     pattern ')' linebreak    DSEMI linebreak
                  | '(' pattern ')' list_opt_sep DSEMI linebreak
                      {{"case" => $ARG[2], "action" => $ARG[4], "comments" => $ARG[6]};}
                  ;
-pattern          :             word         /* Apply rule 4 */
+pattern          :             word
                      {[$ARG[1]];}
-                 | pattern '|' word         /* Do not apply rule 4 */
+                 | pattern '|' word
                      {push $ARG[1], $ARG[2]; $ARG[1];}
                  ;
 if_clause        : If list Then list else_part Fi
@@ -325,31 +389,26 @@ else_part        : Elif list Then list else_part
 while_clause     : While list do_group
                      {{"condition" => $ARG[2], "then" => $ARG[3]};}
                  ;
-do_group         : Do list Done           /* Apply rule 6 */
+do_group         : Do list Done
                      {$ARG[2];}
                  ;
-simple_command   : cmd_prefix cmd_word cmd_suffix
+simple_command   : cmd_prefix word cmd_suffix
                      {mergeCommand($ARG[1], $ARG[3], {"command" => $ARG[2]});}
-                 | cmd_prefix cmd_word
+                 | cmd_prefix word
                      {mergeCommand($ARG[1], {"command" => $ARG[2]});}
                  | cmd_prefix
-                 | cmd_name cmd_suffix
+                 | word cmd_suffix
                      {mergeCommand($ARG[2], {"command" => $ARG[1]});}
-                 | cmd_name
+                 | word
                      {{"command" => $ARG[1]};}
-                 ;
-cmd_name         : WORD                   /* Apply rule 7a */
-                 | NAME
-                 ;
-cmd_word         : word                   /* Apply rule 7b */
                  ;
 cmd_prefix       :            io_redirect
                      {error($ARG[0], "IO redirection currently unsupported");}
                  | cmd_prefix io_redirect
                      {error($ARG[0], "IO redirection currently unsupported");}
-                 |            ASSIGNMENT_WORD
+                 |            assignment_word
                      {{"assignment" => [$ARG[1]]};}
-                 | cmd_prefix ASSIGNMENT_WORD
+                 | cmd_prefix assignment_word
                      {push $ARG[1]->{"assignment"}, $ARG[2]; $ARG[1];}
                  ;
 cmd_suffix       :            io_redirect
@@ -364,23 +423,17 @@ cmd_suffix       :            io_redirect
 redirect_list    :               io_redirect
                  | redirect_list io_redirect
                  ;
-io_redirect      :           io_file
-                 | IO_NUMBER io_file
+io_redirect      : io_file
+                 | DLESS HERE_STRING
                  ;
-io_file          : '<'       filename
-                 | LESSAND   filename
-                 | '>'       filename
-                 | GREATAND  filename
-                 | DGREAT    filename
-                 | LESSGREAT filename
-                 | CLOBBER   filename
-                 ;
-filename         : word                      /* Apply rule 2 */
+io_file          : '<'       word
+                 | '>'       word
+                 | DGREAT    word
+                 | LESSGREAT word
                  ;
 newline          :            NEWLINE
-                     {createLeaf("newline", $ARG[1]);}
                  | SL_COMMENT NEWLINE
-                     {createLeaf("comment", $ARG[1]);}
+                     {$ARG[1] . $ARG[2];}
                  ;
 newline_list     :              newline
                      {createNode("newline_list", $ARG[1]);}
@@ -401,5 +454,53 @@ separator        : separator_op linebreak
 sequential_sep   : ';' linebreak
                      {$ARG[2];}
                  | newline_list
+                 ;
+
+/* Word definition aka quote/variable/escape parsing */
+wordlist         :          word
+                     {createNode("wordlist", $ARG[1]);}
+                 | wordlist word
+                     {appendNode($ARG[1], $ARG[2]);}
+                 ;
+word_or_reserved : word
+                 | reserved_word
+                     {createNode("word", $ARG[1]);}
+                 ;
+word             :                                 word_part
+                     {createNode("word", $ARG[1]);}
+                 | reserved_word WORD_CONTINUATION word_part
+                     {createNode("word", $ARG[1], $ARG[3]);}
+                 | word          WORD_CONTINUATION word_part
+                     {appendNode($ARG[1], $ARG[3]);}
+                 | word          WORD_CONTINUATION reserved_word
+                     {appendNode($ARG[1], $ARG[3]);}
+                 ;
+word_part        : WORD
+                 | WORD_SQUOTED
+                 | VARIABLE
+                     {createLeaf("variable", $ARG[1]);}
+                 | VARIABLE_ASSIGNMENT
+                     {$ARG[1] . "=";}
+                 | NAME
+                 | ESCAPED
+                 ;
+reserved_word    : If
+                 | Then
+                 | Else
+                 | Elif
+                 | Fi
+                 | Do
+                 | Done
+                 | Case
+                 | Esac
+                 | While
+                 | For
+                 | Bang
+                 | In
+                 ;
+assignment_word  : VARIABLE_ASSIGNMENT WORD_CONTINUATION word
+                     {{"var" => $ARG[1], "value" => $ARG[3]};}
+                 | VARIABLE_ASSIGNMENT
+                     {{"var" => $ARG[1]};}
                  ;
 %%

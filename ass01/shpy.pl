@@ -27,11 +27,11 @@ sub dumpParsedSh {
             return;
         }
 
-        Bless($node)->keys([grep {$node->{$_}} qw(
+        Bless($node)->keys([grep {defined $node->{$_}} qw(
             type
+            var
             value
             children
-            var
             word
             in
             comments
