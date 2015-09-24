@@ -264,8 +264,12 @@
 /* -------------------------------------------------------
    The Grammar
    ------------------------------------------------------- */
-%start list_opt_sep
+%start file
 %%
+file             : list_opt_sep
+                 | linebreak
+                     {createNode("list", $ARG[1]);}
+                 ;
 list_no_sep      :             linebreak and_or
                      {createNode("list", $ARG[1], $ARG[2]);}
                  | list_no_sep separator and_or
