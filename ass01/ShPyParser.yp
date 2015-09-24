@@ -435,9 +435,8 @@ io_file          : '<'       word
                  | DGREAT    word
                  | LESSGREAT word
                  ;
-newline          :            NEWLINE
-                 | SL_COMMENT NEWLINE
-                     {$ARG[1] . $ARG[2];}
+newline          : NEWLINE
+                 | SL_COMMENT
                  ;
 newline_list     :              newline
                      {createNode("newline_list", $ARG[1]);}
