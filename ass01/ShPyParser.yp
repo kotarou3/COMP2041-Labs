@@ -123,14 +123,7 @@
     }
 
     sub Lexer {
-        my %wordTokenTypes = (
-            "NAME" => 1,
-            "WORD" => 1,
-            "WORD_SQUOTED" => 1,
-            "WORD_DQUOTED" => 1,
-            "VARIABLE" => 1,
-            "VARIABLE_ASSIGNMENT" => 1,
-            "ESCAPED" => 1,
+        my %reservedWordTypes = (
             "If" => 1,
             "Then" => 1,
             "Else" => 1,
@@ -144,6 +137,15 @@
             "For" => 1,
             "Bang" => 1,
             "In" => 1
+        );
+        my %otherWordTypes = (
+            "NAME" => 1,
+            "WORD" => 1,
+            "WORD_SQUOTED" => 1,
+            "WORD_DQUOTED" => 1,
+            "VARIABLE" => 1,
+            "VARIABLE_ASSIGNMENT" => 1,
+            "ESCAPED" => 1
         );
 
         if (!$ARG[0]->YYData->{"queuedTokens"}) {
@@ -163,8 +165,19 @@
 
         my ($tokenType, $tokenValue) = getNextToken($ARG[0]);
 
+        # A new word starting with a reserved word and not a reserved word is marked as a normal word to help with parsing
+        if ((!$ARG[0]->YYData->{"isInWord"} || $removedLeadingWhitespace) &&
+            $reservedWordTypes{$tokenType} && $ARG[0]->YYData->{"DATA"} =~ /^[^ \t]/) {
+            my ($nextTokenType, $nextTokenValue) = getNextToken($ARG[0]);
+            if ($reservedWordTypes{$nextTokenType} || $otherWordTypes{$nextTokenType}) {
+                $tokenType = "WORD";
+                push(@{$ARG[0]->YYData->{"queuedTokens"}}, ["WORD_CONTINUATION", ""]);
+            }
+            push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$nextTokenType, $nextTokenValue]);
+        }
+
         # If this is the second "word" type token in a row, insert a WORD_CONTINUATION in between
-        if ($wordTokenTypes{$tokenType}) {
+        if ($reservedWordTypes{$tokenType} || $otherWordTypes{$tokenType}) {
             if (!$removedLeadingWhitespace && $ARG[0]->YYData->{"isInWord"}) {
                 push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$tokenType, $tokenValue]);
                 return ("WORD_CONTINUATION", "");
@@ -474,8 +487,6 @@ word             : word_no_assign
                  ;
 word_no_assign   :                                  word_part
                      {createNode("word", $ARG[1]);}
-                 | reserved_word  WORD_CONTINUATION word_part
-                     {createNode("word", $ARG[1], $ARG[3]);}
                  | word_no_assign WORD_CONTINUATION word_part
                      {appendNode($ARG[1], $ARG[3]);}
                  | word_no_assign WORD_CONTINUATION reserved_word
