@@ -392,14 +392,14 @@ while_clause     : While list do_group
 do_group         : Do list Done
                      {$ARG[2];}
                  ;
-simple_command   : cmd_prefix word cmd_suffix
+simple_command   : cmd_prefix word_no_assign cmd_suffix
                      {mergeCommand($ARG[1], $ARG[3], {"command" => $ARG[2]});}
-                 | cmd_prefix word
+                 | cmd_prefix word_no_assign
                      {mergeCommand($ARG[1], {"command" => $ARG[2]});}
                  | cmd_prefix
-                 | word cmd_suffix
+                 | word_no_assign cmd_suffix
                      {mergeCommand($ARG[2], {"command" => $ARG[1]});}
-                 | word
+                 | word_no_assign
                      {{"command" => $ARG[1]};}
                  ;
 cmd_prefix       :            io_redirect
@@ -466,21 +466,24 @@ word_or_reserved : word
                  | reserved_word
                      {createNode("word", $ARG[1]);}
                  ;
-word             :                                 word_part
+word             : word_no_assign
+                 | assignment_word
+                 ;
+word_no_assign   :                                  word_part
                      {createNode("word", $ARG[1]);}
-                 | reserved_word WORD_CONTINUATION word_part
+                 | reserved_word  WORD_CONTINUATION word_part
                      {createNode("word", $ARG[1], $ARG[3]);}
-                 | word          WORD_CONTINUATION word_part
+                 | word_no_assign WORD_CONTINUATION word_part
                      {appendNode($ARG[1], $ARG[3]);}
-                 | word          WORD_CONTINUATION reserved_word
+                 | word_no_assign WORD_CONTINUATION reserved_word
                      {appendNode($ARG[1], $ARG[3]);}
+                 | word_no_assign WORD_CONTINUATION VARIABLE_ASSIGNMENT
+                     {appendNode($ARG[1], $ARG[3] . "=");}
                  ;
 word_part        : WORD
                  | WORD_SQUOTED
                  | VARIABLE
                      {createLeaf("variable", $ARG[1]);}
-                 | VARIABLE_ASSIGNMENT
-                     {$ARG[1] . "=";}
                  | NAME
                  | ESCAPED
                  ;
