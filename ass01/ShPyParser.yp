@@ -195,7 +195,7 @@
         my $type = shift @ARG;
         return {
             "type" => $type,
-            "children" => grep { $_ } \@ARG
+            "children" => \@ARG
         };
     }
     sub createLeaf {
@@ -206,7 +206,7 @@
     }
     sub appendNode {
         my $node = shift @ARG;
-        push $node->{"children"}, grep { $_ } @ARG;
+        push $node->{"children"}, @ARG;
         return $node;
     }
 
