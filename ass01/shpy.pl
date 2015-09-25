@@ -49,7 +49,16 @@ sub convert {
     %action = (
         "list" => sub {
             my ($list) = @ARG;
-            return join("", &$doDefaultNext($list));
+            my @result = &$doDefaultNext($list);
+
+            # Remove semicolons if a comment immediately follows
+            for (my $r = 0; $r < scalar @result - 1; ++$r) {
+                if ($result[$r + 1] =~ /^#/) {
+                    $result[$r] =~ s/; $/ /;
+                }
+            }
+
+            return join("", @result);
         },
 
         "newline_list" => sub {
@@ -104,13 +113,13 @@ sub convert {
                     shift @args;
                     shift @globbedArgs;
                     if (!$isCommandGlobbed) {
-                        return "print " . join(", ", @args) . ";";
+                        return scalar @args > 0 ? "print " . join(", ", @args) . "; " : "print; ";
                     } else {
-                        return "print \" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . ");";
+                        return "print \" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
                     }
                 } else {
                     $usedBuiltins{"call"} = 1;
-                    return "call(" . &$globsToPythonList(\@args, \@globbedArgs) . ");";
+                    return "call(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
                 }
             } elsif ($simpleCommand->{"assignment"}) {
                 # Variable assignment
@@ -124,7 +133,7 @@ sub convert {
                     }
 
                     $_->{"var"} . " = " . $value;
-                } @{$simpleCommand->{"assignment"}}) . ";";
+                } @{$simpleCommand->{"assignment"}}) . "; ";
             } else {
                 # Only IO redirection
                 print(STDERR "Warning: IO redirection currently unsupported\n");
