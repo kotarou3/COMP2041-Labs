@@ -41,7 +41,7 @@ sub convert {
             }
         }
 
-        return join(" + ", @result);
+        return join(" + ", @result) || "[]";
     };
 
     my ($doDefault, $doDefaultNext);
@@ -142,8 +142,72 @@ sub convert {
         },
 
         "compound_command" => sub {
-            print(STDERR "Warning: Compound commands are currently unsupported\n");
-            return "# compound_command";
+            my ($compoundCommand) = @ARG;
+            return &$doDefaultNext($compoundCommand);
+        },
+
+        "for_clause" => sub {
+            my ($forClause) = @ARG;
+            $forClause = $forClause->{"value"};
+
+            my $in = &$doDefault($forClause->{"in"});
+            if (!$isGlobbed && $in ne "[]") {
+                # Non-zero length lists don't need the the enclosing brackets for for loops
+                $in =~ s/^\[//;
+                $in =~ s/\]$//;
+            }
+
+            $variableTypes{$forClause->{"var"}} = "string"; # XXX: Assume user doesn't want any extra globbing
+
+            my $action = &$doDefault($forClause->{"action"});
+
+            my $comments = "";
+            if ($forClause->{"comments"}) {
+                $comments = &$doDefault($forClause->{"comments"});
+            }
+
+            if (!($comments =~ /\n/) && !($action =~ /^\n/)) {
+                # Python needs a newline before the first action
+                $comments .= "\n";
+            } elsif ($comments =~ /\n$/ && $action =~ /^\n/) {
+                # Get rid of blank line caused by the `do` removal
+                $comments =~ s/\n$//;
+            }
+
+            $action =~ s/^/    /gm; # Add indentation
+            return "for " . $forClause->{"var"} . " in $in:$comments$action";
+        },
+
+        "case_clause" => sub {
+            print(STDERR "Warning: The case clause is currently unsupported\n");
+            return "# case_clause";
+        },
+
+        "if_clause" => sub {
+            print(STDERR "Warning: The if clause is currently unsupported\n");
+            return "# if_clause";
+        },
+
+        "while_clause" => sub {
+            print(STDERR "Warning: The while clause is currently unsupported\n");
+            return "# while_clause";
+        },
+
+        "wordlist" => sub {
+            my ($wordlist) = @ARG;
+            $wordlist = $wordlist->{"children"};
+
+            my @words;
+            my @globbedWords;
+            my $isAnyGlobbed = 0;
+            foreach my $word (@$wordlist) {
+                push(@words, &$doDefault($word));
+                push(@globbedWords, $isGlobbed);
+                $isAnyGlobbed = $isGlobbed || $isAnyGlobbed;
+            }
+
+            $isGlobbed = $isAnyGlobbed;
+            return &$globsToPythonList(\@words, \@globbedWords);
         },
 
         "word" => sub {

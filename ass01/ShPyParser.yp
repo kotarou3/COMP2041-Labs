@@ -323,20 +323,33 @@ command          : simple_command
                      {error($ARG[0], "IO redirection currently unsupported");}
                  ;
 compound_command : for_clause
-                     {createLeaf("for", $ARG[1]);}
+                     {createLeaf("for_clause", $ARG[1]);}
                  | case_clause
-                     {createLeaf("case", $ARG[1]);}
+                     {createLeaf("case_clause", $ARG[1]);}
                  | if_clause
-                     {createLeaf("if", $ARG[1]);}
+                     {createLeaf("if_clause", $ARG[1]);}
                  | while_clause
-                     {createLeaf("while", $ARG[1]);}
+                     {createLeaf("while_clause", $ARG[1]);}
                  ;
 for_clause       : For NAME                                      do_group
-                     {{"var" => $ARG[2], "in" => ["\$@"], "action" => $ARG[3]};}
+                     {
+                         {
+                             "var" => $ARG[2],
+                             "in" => createNode("wordlist", createNode("word", createLeaf("variable", "@"))),
+                             "action" => $ARG[3]
+                         };
+                     }
                  | For NAME                       sequential_sep do_group
-                     {{"var" => $ARG[2], "in" => ["\$@"], "comments" => $ARG[3], "action" => $ARG[4]};}
+                     {
+                         {
+                             "var" => $ARG[2],
+                             "in" => createNode("wordlist", createNode("word", createLeaf("variable", "@"))),
+                             "comments" => $ARG[3],
+                             "action" => $ARG[4]
+                         };
+                     }
                  | For NAME linebreak In          sequential_sep do_group
-                     {{"var" => $ARG[2], "in" => [], "comments" => $ARG[5], "action" => $ARG[6]};}
+                     {{"var" => $ARG[2], "in" => createNode("wordlist"), "comments" => $ARG[5], "action" => $ARG[6]};}
                  | For NAME linebreak In wordlist sequential_sep do_group
                      {{"var" => $ARG[2], "in" => $ARG[5], "comments" => $ARG[6], "action" => $ARG[7]};}
                  ;
