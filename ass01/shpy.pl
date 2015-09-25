@@ -206,13 +206,65 @@ sub convert {
         },
 
         "if_clause" => sub {
-            print(STDERR "Warning: The if clause is currently unsupported\n");
-            return "# if_clause";
+            my ($ifClause) = @ARG;
+            $ifClause = $ifClause->{"value"};
+
+            my $result = "";
+            while (1) {
+                my $condition = &$doDefault($ifClause->{"condition"});
+                $condition =~ s/;\s+$//;
+                if ($condition =~ /[&;\n]/) {
+                    print(STDERR "Warning: Multi-statement conditions not supported. Output might be invalid\n");
+                }
+
+                my $then = &$doDefault($ifClause->{"then"});
+                $then =~ /^\n/ or $then = "\n$then"; # Python needs a newline
+                $then =~ s/^/    /gm; # Add indentation
+
+                if (length $result == 0) {
+                    $result = "if $condition:$then";
+                } else {
+                    $result =~ /\n$/ or $result .= "\n"; # Python needs a newline
+                    $result .= "elif $condition:$then";
+                }
+
+                if ($ifClause->{"else"}) {
+                    if (!$ifClause->{"else"}->{"condition"}) {
+                        my $else = &$doDefault($ifClause->{"else"});
+                        $else =~ /^\n/ or $else = "\n$else"; # Python needs a newline
+                        $else =~ s/^/    /gm; # Add indentation
+
+                        $result =~ /\n$/ or $result .= "\n"; # Python needs a newline
+                        $result .= "else:$else";
+
+                        last;
+                    } else {
+                        $ifClause = $ifClause->{"else"};
+                        next;
+                    }
+                } else {
+                    last;
+                }
+            }
+
+            return $result;
         },
 
         "while_clause" => sub {
-            print(STDERR "Warning: The while clause is currently unsupported\n");
-            return "# while_clause";
+            my ($whileClause) = @ARG;
+            $whileClause = $whileClause->{"value"};
+
+            my $condition = &$doDefault($whileClause->{"condition"});
+            $condition =~ s/;\s+$//;
+            if ($condition =~ /[&;\n]/) {
+                print(STDERR "Warning: Multi-statement conditions not supported. Output might be invalid\n");
+            }
+
+            my $then = &$doDefault($whileClause->{"then"});
+            $then =~ /^\n/ or $then = "\n$then"; # Python needs a newline
+            $then =~ s/^/    /gm; # Add indentation
+
+            return "while $condition:$then";
         },
 
         "wordlist" => sub {
