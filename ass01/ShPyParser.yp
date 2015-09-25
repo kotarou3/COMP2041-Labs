@@ -151,35 +151,38 @@
         if (!$ARG[0]->YYData->{"queuedTokens"}) {
             $ARG[0]->YYData->{"queuedTokens"} = [];
         }
+
+        my ($tokenType, $tokenValue);
         if (scalar @{$ARG[0]->YYData->{"queuedTokens"}}) {
-            return @{shift(@{$ARG[0]->YYData->{"queuedTokens"}})};
-        }
+            ($tokenType, $tokenValue) = @{shift(@{$ARG[0]->YYData->{"queuedTokens"}})};
+        } else {
+            # Whitespace is ignored (outside of quotes)
+            if ($ARG[0]->YYData->{"DATA"} =~ s/^([ \t]+)//) {
+                $ARG[0]->YYData->{"isInWord"} = 0;
+            }
 
-        # Whitespace is ignored (outside of quotes)
-        $ARG[0]->YYData->{"DATA"} =~ s/^([ \t]+)//;
-        my $removedLeadingWhitespace = $1;
+            if (length $ARG[0]->YYData->{"DATA"} == 0) {
+                return ("", undef);
+            }
 
-        if (length $ARG[0]->YYData->{"DATA"} == 0) {
-            return ("", undef);
-        }
-
-        my ($tokenType, $tokenValue) = getNextToken($ARG[0]);
+            ($tokenType, $tokenValue) = getNextToken($ARG[0]);
+         }
 
         # A new word starting with a reserved word and not a reserved word is marked as a normal word to help with parsing
-        if ((!$ARG[0]->YYData->{"isInWord"} || $removedLeadingWhitespace) &&
-            $reservedWordTypes{$tokenType} && $ARG[0]->YYData->{"DATA"} =~ /^[^ \t]/) {
+        if (!$ARG[0]->YYData->{"isInWord"} && $reservedWordTypes{$tokenType} && $ARG[0]->YYData->{"DATA"} =~ /^[^ \t]/) {
             my ($nextTokenType, $nextTokenValue) = getNextToken($ARG[0]);
+            push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$nextTokenType, $nextTokenValue]);
+
             if ($reservedWordTypes{$nextTokenType} || $otherWordTypes{$nextTokenType}) {
                 $tokenType = "WORD";
-                push(@{$ARG[0]->YYData->{"queuedTokens"}}, ["WORD_CONTINUATION", ""]);
             }
-            push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$nextTokenType, $nextTokenValue]);
         }
 
         # If this is the second "word" type token in a row, insert a WORD_CONTINUATION in between
         if ($reservedWordTypes{$tokenType} || $otherWordTypes{$tokenType}) {
-            if (!$removedLeadingWhitespace && $ARG[0]->YYData->{"isInWord"}) {
+            if ($ARG[0]->YYData->{"isInWord"}) {
                 push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$tokenType, $tokenValue]);
+                $ARG[0]->YYData->{"isInWord"} = 0; # Don't infinitely return WORD_CONTINUATIONs
                 return ("WORD_CONTINUATION", "");
             } else {
                 $ARG[0]->YYData->{"isInWord"} = 1;
