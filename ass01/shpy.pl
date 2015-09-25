@@ -334,7 +334,7 @@ sub convert {
         $rootNode->{"children"}[0]->{"type"} eq "newline_list" &&
         $rootNode->{"children"}[0]->{"children"}[0] &&
         $rootNode->{"children"}[0]->{"children"}[0] =~ /^#!/) {
-        $rootNode->{"children"}[0]->{"children"}[0] = "#!/usr/bin/python";
+        $rootNode->{"children"}[0]->{"children"}[0] = "#!/usr/bin/python -u";
         $hasShebang = 1;
     }
 
