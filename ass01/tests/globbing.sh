@@ -16,3 +16,6 @@ b='./\*\[\?\][.]*?'
 c=a
 echo a $a b c $b d $c e
 a $a b c $b d $c e
+
+# os.chdir(sorted(glob.glob("examples/*"))[0])
+cd examples/*

@@ -109,7 +109,15 @@ sub convert {
                     }
                 }
 
-                if ($args[0] eq "\"echo\"") {
+                if ($args[0] eq "\"cd\"" && scalar @args == 2) {
+                    $usedImports{"os"} = 1;
+                    if (!$isCommandGlobbed) {
+                        return "os.chdir(" . $args[1] . "); ";
+                    } else {
+                        $usedImports{"glob"} = 1;
+                        return "os.chdir(sorted(glob.glob(" . $args[1] . "))[0]); ";
+                    }
+                } elsif ($args[0] eq "\"echo\"") {
                     shift @args;
                     shift @globbedArgs;
                     if (!$isCommandGlobbed) {
@@ -117,6 +125,20 @@ sub convert {
                     } else {
                         return "print \" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
                     }
+                } elsif ($args[0] eq "\"exit\"" && scalar @args == 2 && !$isCommandGlobbed) {
+                    $usedImports{"sys"} = 1;
+                    return "sys.exit(" . $args[1] . "); ";
+                } elsif ($args[0] eq "\"read\"" && (scalar @args == 1 || scalar @args == 2 && $args[1] =~ /"([a-z_][a-z0-9_]*)"/i)) {
+                    my $var;
+                    if (scalar @args == 1) {
+                        $var = "REPLY";
+                    } else {
+                        $var = $1;
+                    }
+
+                    $usedImports{"sys"} = 1;
+                    $variableTypes{$var} = "string"; # XXX: Assume user doesn't want any globbing
+                    return "$var = sys.stdin.readline().strip(); ";
                 } else {
                     $usedBuiltins{"call"} = 1;
                     return "call(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
