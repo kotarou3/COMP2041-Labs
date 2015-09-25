@@ -265,7 +265,7 @@ sub convert {
     # Add builtins/imports to result
     if (scalar @builtins > 0) {
         if ($hasShebang) {
-            $result =~ s/\n/"\n\n" . join("\n", @builtins) . "\n"/e;
+            $result =~ s/\n\n?/"\n\n" . join("\n", @builtins) . "\n"/e;
         } else {
             $result = join("\n", @builtins) . "\n$result";
         }
