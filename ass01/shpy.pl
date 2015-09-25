@@ -19,6 +19,11 @@ sub convert {
     my %variableTypes;
     my $isGlobbed = 0;
 
+    # XXX: Assume command arguments don't need to be globbed
+    for (my $n = 0; $n < 10; ++$n) {
+        $variableTypes{"sys.argv[$n]"} = "string";
+    }
+
     my $globsToPythonList = sub {
         # Glob each element of $args depending on the flag in $globbedArgs
         # and return the result as a python list
@@ -294,6 +299,12 @@ sub convert {
             foreach my $part (@$word) {
                 if (ref($part) eq "HASH") {
                     if ($part->{"type"} eq "variable") {
+                        # Check for command arguments ($0..$9)
+                        if ($part->{"value"} =~ /^([0-9])$/) {
+                            $usedImports{"sys"} = 1;
+                            $part->{"value"} = "sys.argv[$1]";
+                        }
+
                         # If the variable has been "tainted" with a glob or is unknown, the entire word is globbed
                         if (!defined $variableTypes{$part->{"value"}} || $variableTypes{$part->{"value"}} eq "glob") {
                             $isGlobbed = 1;
