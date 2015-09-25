@@ -500,10 +500,12 @@ word_no_assign   :                                  word_part
                  ;
 word_part        : WORD
                  | WORD_SQUOTED
+                     {createLeaf("word_squoted", $ARG[1]);}
                  | VARIABLE
                      {createLeaf("variable", $ARG[1]);}
                  | NAME
                  | ESCAPED
+                     {createLeaf("word_squoted", $ARG[1]);} /* Functionally the same */
                  ;
 reserved_word    : If
                  | Then

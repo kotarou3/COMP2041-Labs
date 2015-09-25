@@ -16,9 +16,37 @@ sub convert {
     my ($rootNode) = @ARG;
 
     my (%usedImports, %usedBuiltins);
+    my %variableTypes;
+    my $isGlobbed = 0;
+
+    my $globsToPythonList = sub {
+        # Glob each element of $args depending on the flag in $globbedArgs
+        # and return the result as a python list
+        my @args = @{$ARG[0]};
+        my @globbedArgs = @{$ARG[1]};
+
+        my @result;
+        while (scalar @args > 0) {
+            if (!$globbedArgs[0]) {
+                my @currentUnglobbedRun;
+                while (scalar @args > 0 && !$globbedArgs[0]) {
+                    push(@currentUnglobbedRun, shift(@args));
+                    shift(@globbedArgs);
+                }
+                push(@result, "[" . join(", ", @currentUnglobbedRun) . "]");
+            } else {
+                $usedImports{"glob"} = 1;
+                push(@result, "sorted(glob.glob(" . shift(@args) . "))");
+                shift(@globbedArgs);
+            }
+        }
+
+        return join(" + ", @result);
+    };
 
     my ($doDefault, $doDefaultNext);
-    my %action = (
+    my %action;
+    %action = (
         "list" => sub {
             my ($list) = @ARG;
             return join("", &$doDefaultNext($list));
@@ -60,21 +88,42 @@ sub convert {
                     print(STDERR "Warning: Environment assignment currently unsupported\n");
                 }
 
-                my @args = (&$doDefault($simpleCommand->{"command"}));
+                my @args = &$doDefault($simpleCommand->{"command"});
+                my @globbedArgs = ($isGlobbed);
+                my $isCommandGlobbed = $isGlobbed;
+
                 if ($simpleCommand->{"args"}) {
-                    push(@args, map {&$doDefault($_);} @{$simpleCommand->{"args"}});
+                    foreach my $arg (@{$simpleCommand->{"args"}}) {
+                        push(@args, &$doDefault($arg));
+                        push(@globbedArgs, $isGlobbed);
+                        $isCommandGlobbed = $isGlobbed || $isCommandGlobbed;
+                    }
                 }
 
                 if ($args[0] eq "\"echo\"") {
-                    return "print " . join(", ", @args[1 .. $#args]) . ";";
+                    shift @args;
+                    shift @globbedArgs;
+                    if (!$isCommandGlobbed) {
+                        return "print " . join(", ", @args) . ";";
+                    } else {
+                        return "print \" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . ");";
+                    }
                 } else {
                     $usedBuiltins{"call"} = 1;
-                    return "call([" . join(", ", @args) . "]);";
+                    return "call(" . &$globsToPythonList(\@args, \@globbedArgs) . ");";
                 }
             } elsif ($simpleCommand->{"assignment"}) {
                 # Variable assignment
                 return join("; ", map {
-                    $_->{"var"} . " = " . &$doDefault($_->{"value"});
+                    my $value = $action{"word"}($_->{"value"}, 1);
+                    if ($isGlobbed) {
+                        # Globs are evaluated at command execution
+                        $variableTypes{$_->{"var"}} = "glob";
+                    } else {
+                        $variableTypes{$_->{"var"}} = "string";
+                    }
+
+                    $_->{"var"} . " = " . $value;
                 } @{$simpleCommand->{"assignment"}}) . ";";
             } else {
                 # Only IO redirection
@@ -89,15 +138,47 @@ sub convert {
         },
 
         "word" => sub {
-            my ($word) = @ARG;
+            my ($word, $ignoreGlobbing) = @ARG;
             $word = $word->{"children"};
 
+            # Check if the word has any globs first
+            # If globbing is ignored, check if the resulting word contains any globs
+            $isGlobbed = 0;
+            foreach my $part (@$word) {
+                if (ref($part) eq "HASH") {
+                    if ($part->{"type"} eq "variable") {
+                        # If the variable has been "tainted" with a glob or is unknown, the entire word is globbed
+                        if (!defined $variableTypes{$part->{"value"}} || $variableTypes{$part->{"value"}} eq "glob") {
+                            $isGlobbed = 1;
+                        }
+                    } elsif ($part->{"type"} eq "word_squoted") {
+                        # Globbing doesn't happen in quotes and escapes, unless we're ignoring globbing
+                        if ($ignoreGlobbing) {
+                            $part->{"value"} =~ /[]*?[]/ and $isGlobbed = 1;
+                        }
+                    } else {
+                        die("Should never happen");
+                    }
+                } else {
+                    $part =~ /[]*?[]/ and $isGlobbed = 1;
+                }
+            }
+
+            # Build the format string
             my @variables;
             my $result = join("", map {
                 if (ref($_) eq "HASH") {
-                    $_->{"type"} eq "variable" or die("Should never happen");
-                    push(@variables, $_->{"value"});
-                    "{" . (scalar @variables - 1) . "}";
+                    if ($_->{"type"} eq "variable") {
+                        push(@variables, $_->{"value"});
+                        "{" . (scalar @variables - 1) . "}";
+                    } elsif ($_->{"type"} eq "word_squoted") {
+                        # Escape globs if necessary
+                        if ($isGlobbed && !$ignoreGlobbing) {
+                            $_->{"value"} =~ s/([]*?[])/[$1]/g;
+                        }
+
+                        $_->{"value"};
+                    }
                 } else {
                     $_;
                 }
