@@ -2,6 +2,7 @@
    http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html */
 
 %{
+    use v5.10;
     use strict;
     use warnings;
     use English;
@@ -209,7 +210,7 @@
     }
     sub appendNode {
         my $node = shift @ARG;
-        push $node->{"children"}, @ARG;
+        push @{$node->{"children"}}, @ARG;
         return $node;
     }
 
@@ -341,27 +342,27 @@ for_clause       : For NAME                                      do_group
                  ;
 case_clause      : Case word linebreak In linebreak case_list    Esac
                      {
-                         push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
+                         push(@{$ARG[3]->{"children"}}, @{$ARG[5]->{"children"}});
                          {"word" => $ARG[2], "comments" => $ARG[3], "cases" => $ARG[6]};
                      }
                  | Case word linebreak In linebreak case_list_ns Esac
                      {
-                         push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
+                         push(@{$ARG[3]->{"children"}}, @{$ARG[5]->{"children"}});
                          {"word" => $ARG[2], "comments" => $ARG[3], "cases" => $ARG[6]};
                      }
                  | Case word linebreak In linebreak              Esac
                      {
-                         push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
+                         push(@{$ARG[3]->{"children"}}, @{$ARG[5]->{"children"}});
                          {"word" => $ARG[2], "comments" => $ARG[3]};
                      }
                  ;
 case_list_ns     : case_list case_item_ns
-                     {push $ARG[1], $ARG[2]; $ARG[1];}
+                     {push @{$ARG[1]}, $ARG[2]; $ARG[1];}
                  |           case_item_ns
                      {[$ARG[1]];}
                  ;
 case_list        : case_list case_item
-                     {push $ARG[1], $ARG[2]; $ARG[1];}
+                     {push @{$ARG[1]}, $ARG[2]; $ARG[1];}
                  |           case_item
                      {[$ARG[1]];}
                  ;
@@ -376,14 +377,14 @@ case_item_ns     :     pattern ')'      linebreak
                  ;
 case_item        :     pattern ')' linebreak    DSEMI linebreak
                      {
-                         push($ARG[3]->{"children"}, @{$ARG[5]->{"children"}});
+                         push(@{$ARG[3]->{"children"}}, @{$ARG[5]->{"children"}});
                          {"case" => $ARG[1], "comments" => $ARG[3]};
                      }
                  |     pattern ')' list_opt_sep DSEMI linebreak
                      {{"case" => $ARG[1], "action" => $ARG[3], "comments" => $ARG[5]};}
                  | '(' pattern ')' linebreak    DSEMI linebreak
                      {
-                         push($ARG[4]->{"children"}, @{$ARG[6]->{"children"}});
+                         push(@{$ARG[4]->{"children"}}, @{$ARG[6]->{"children"}});
                          {"case" => $ARG[2], "comments" => $ARG[4]};
                      }
                  | '(' pattern ')' list_opt_sep DSEMI linebreak
@@ -392,7 +393,7 @@ case_item        :     pattern ')' linebreak    DSEMI linebreak
 pattern          :             word
                      {[$ARG[1]];}
                  | pattern '|' word
-                     {push $ARG[1], $ARG[2]; $ARG[1];}
+                     {push @{$ARG[1]}, $ARG[2]; $ARG[1];}
                  ;
 if_clause        : If list Then list else_part Fi
                      {{"condition" => $ARG[2], "then" => $ARG[4], "else" => $ARG[5]};}
@@ -429,7 +430,7 @@ cmd_prefix       :            io_redirect
                  |            assignment_word
                      {{"assignment" => [$ARG[1]]};}
                  | cmd_prefix assignment_word
-                     {push $ARG[1]->{"assignment"}, $ARG[2]; $ARG[1];}
+                     {push @{$ARG[1]->{"assignment"}}, $ARG[2]; $ARG[1];}
                  ;
 cmd_suffix       :            io_redirect
                      {error($ARG[0], "IO redirection currently unsupported");}
@@ -438,7 +439,7 @@ cmd_suffix       :            io_redirect
                  |            word_or_reserved
                      {{"args" => [$ARG[1]]}}
                  | cmd_suffix word_or_reserved
-                     {push $ARG[1]->{"args"}, $ARG[2]; $ARG[1];}
+                     {push @{$ARG[1]->{"args"}}, $ARG[2]; $ARG[1];}
                  ;
 redirect_list    :               io_redirect
                  | redirect_list io_redirect
