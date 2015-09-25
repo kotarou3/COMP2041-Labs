@@ -286,8 +286,11 @@ sub convert {
 sub postProcess {
     my ($result) = @ARG;
 
-    # Remove trailing whitespace and semicolons
+    # Remove trailing spaces and semicolons
     $result =~ s/[; ]+$//mg;
+
+    # Remove double blank lines
+    $result =~ s/\n{3,}/\n/g;
 
     return $result;
 }
