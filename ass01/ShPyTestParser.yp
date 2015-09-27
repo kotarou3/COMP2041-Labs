@@ -1,0 +1,241 @@
+/* Converts the shell builtin `test` or `[` into python */
+
+%{
+    use v5.10;
+    use strict;
+    use warnings;
+    use English;
+
+    sub Lexer {
+        my %tokenTypes = (
+            "\"-b\"" => "b",
+            "\"-c\"" => "c",
+            "\"-d\"" => "d",
+            "\"-e\"" => "e",
+            "\"-f\"" => "f",
+            "\"-g\"" => "g",
+            "\"-h\"" => "h",
+            "\"-k\"" => "k",
+            "\"-n\"" => "n",
+            "\"-p\"" => "p",
+            "\"-r\"" => "r",
+            "\"-s\"" => "s",
+            "\"-t\"" => "t",
+            "\"-u\"" => "u",
+            "\"-w\"" => "w",
+            "\"-x\"" => "x",
+            "\"-z\"" => "z",
+            "\"-L\"" => "L",
+            "\"-O\"" => "O",
+            "\"-G\"" => "G",
+            "\"-S\"" => "S",
+            "\"-nt\"" => "nt",
+            "\"-ot\"" => "ot",
+            "\"-ef\"" => "ef",
+            "\"=\"" => "EQUAL",
+            "\"!=\"" => "NEQUAL",
+            "\">\"" => "GREAT",
+            "\"<\"" => "LESS",
+            "\"-eq\"" => "eq",
+            "\"-ne\"" => "ne",
+            "\"-gt\"" => "gt",
+            "\"-ge\"" => "ge",
+            "\"-lt\"" => "lt",
+            "\"-le\"" => "le",
+            "\"-a\"" => "AND",
+            "\"-o\"" => "OR",
+            "\"!\"" => "NOT",
+            "\"(\"" => "(",
+            "\")\"" => ")",
+            "\"]\"" => "]"
+        );
+
+        if (!$ARG[0]->YYData->{"usedImports"}) {
+            $ARG[0]->YYData->{"usedImports"} = {};
+        }
+
+        if (scalar @{$ARG[0]->YYData->{"ARGS"}}) {
+            my $token = shift(@{$ARG[0]->YYData->{"ARGS"}});
+            my $type = $tokenTypes{$token} || "TOKEN";
+            return ($type, $token);
+        } else {
+            return ("", undef);
+        }
+    }
+%}
+
+%token TOKEN
+%token b c d e f g h k n p r s t u w x z L O G S
+%token nt ot ef
+%token EQUAL NEQUAL GREAT LESS
+%token eq ne gt ge lt le
+%token NOT AND OR
+
+%left OR
+%left AND
+%right NOT
+
+%start test
+%%
+test       : expression ']'
+           | expression
+           ;
+expression : b TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   $ARG[0]->YYData->{"usedImports"}->{"stat"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and stat.S_ISBLK(os.stat(" . $ARG[2] . ").st_mode)";
+               }
+           | c TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   $ARG[0]->YYData->{"usedImports"}->{"stat"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and stat.S_ISCHR(os.stat(" . $ARG[2] . ").st_mode)";
+               }
+           | d TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.isdir(" . $ARG[2] . ")";
+               }
+           | e TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.exists(" . $ARG[2] . ")";
+               }
+           | f TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.isfile(" . $ARG[2] . ")";
+               }
+           | g TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   $ARG[0]->YYData->{"usedImports"}->{"stat"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and os.stat(" . $ARG[2] . ").st_mode & stat.S_ISGID";
+               }
+           | h TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.islink(" . $ARG[2] . ")";
+               }
+           | k TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   $ARG[0]->YYData->{"usedImports"}->{"stat"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and os.stat(" . $ARG[2] . ").st_mode & stat.S_ISVTX";
+               }
+           | n TOKEN
+               {"len(" . $ARG[2] . ") > 0";}
+           | p TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   $ARG[0]->YYData->{"usedImports"}->{"stat"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and stat.S_ISFIFO(os.stat(" . $ARG[2] . ").st_mode)";
+               }
+           | r TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.access(" . $ARG[2] . ", os.R_OK)";
+               }
+           | s TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and os.path.getsize(" . $ARG[2] . ") > 0";
+               }
+           | t TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.isatty(int(" . $ARG[2] . "))";
+               }
+           | u TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   $ARG[0]->YYData->{"usedImports"}->{"stat"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and os.stat(" . $ARG[2] . ").st_mode & stat.S_ISUID";
+               }
+           | w TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.access(" . $ARG[2] . ", os.W_OK)";
+               }
+           | x TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.access(" . $ARG[2] . ", os.X_OK)";
+               }
+           | z TOKEN
+               {"len(" . $ARG[2] . ") == 0";}
+           | L TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.islink(" . $ARG[2] . ")";
+               }
+           | O TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and os.stat(" . $ARG[2] . ").st_uid == os.geteuid()";
+               }
+           | G TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and os.stat(" . $ARG[2] . ").st_gid == os.getegid()";
+               }
+           | S TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   $ARG[0]->YYData->{"usedImports"}->{"stat"} = 1;
+                   "os.path.exists(" . $ARG[2] . ") and stat.S_ISSOCK(os.stat(" . $ARG[2] . ").st_mode)";
+               }
+           | TOKEN nt TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.exists(" . $ARG[1] . ") and os.path.exists(" . $ARG[3] . ") and os.path.getmtime(" . $ARG[1] . ") > os.path.getmtime(" . $ARG[3] . ")";
+               }
+           | TOKEN ot TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.exists(" . $ARG[1] . ") and os.path.exists(" . $ARG[3] . ") and os.path.getmtime(" . $ARG[1] . ") < os.path.getmtime(" . $ARG[3] . ")";
+               }
+           | TOKEN ef TOKEN
+               {
+                   $ARG[0]->YYData->{"usedImports"}->{"os"} = 1;
+                   "os.path.exists(" . $ARG[1] . ") and os.path.exists(" . $ARG[3] . ") and os.path.samefile(" . $ARG[1] . ", " . $ARG[3] . ")";
+               }
+           | TOKEN
+               {"len(" . $ARG[1] . ") > 0";}
+           | TOKEN EQUAL TOKEN
+               {$ARG[1] . " == " . $ARG[3];}
+           | TOKEN NEQUAL TOKEN
+               {$ARG[1] . " != " . $ARG[3];}
+           | TOKEN GREAT TOKEN
+               {$ARG[1] . " > " . $ARG[3];}
+           | TOKEN LESS TOKEN
+               {$ARG[1] . " < " . $ARG[3];}
+           | TOKEN eq TOKEN
+               {"int(" . $ARG[1] . ") == int(" . $ARG[3] . ")";}
+           | TOKEN ne TOKEN
+               {"int(" . $ARG[1] . ") != int(" . $ARG[3] . ")";}
+           | TOKEN gt TOKEN
+               {"int(" . $ARG[1] . ") > int(" . $ARG[3] . ")";}
+           | TOKEN ge TOKEN
+               {"int(" . $ARG[1] . ") >= int(" . $ARG[3] . ")";}
+           | TOKEN lt TOKEN
+               {"int(" . $ARG[1] . ") < int(" . $ARG[3] . ")";}
+           | TOKEN le TOKEN
+               {"int(" . $ARG[1] . ") <= int(" . $ARG[3] . ")";}
+           | NOT expression
+               {
+                   # XXX: Heuristic; Could do better, but adds complexity
+                   if ($ARG[2] =~ / and / && !($ARG[2] =~ /^\(.*\)$/)) {
+                       $ARG[2] = "(" . $ARG[2] . ")";
+                   }
+                   "not " . $ARG[2];
+               }
+           | expression AND expression
+               {$ARG[1] . " and " . $ARG[3];}
+           | expression OR expression
+               {$ARG[1] . " or " . $ARG[3];}
+           | '(' expression ')'
+               {"(" . $ARG[2] . ")";}
+           ;
+%%

@@ -5,12 +5,17 @@ use warnings;
 
 use English;
 
-# Recompile parser if it's out of date
+# Recompile parsers if they're out of date
 if ((-M "ShPyParser.pm" || "inf") > -M "ShPyParser.yp") {
     system("yapp ShPyParser.yp");
 }
+if ((-M "ShPyTestParser.pm" || "inf") > -M "ShPyTestParser.yp") {
+    system("yapp ShPyTestParser.yp");
+}
 require ShPyParser;
+require ShPyTestParser;
 ShPyParser->import();
+ShPyTestParser->import();
 
 sub convert {
     my ($rootNode) = @ARG;
@@ -114,6 +119,7 @@ sub convert {
                     }
                 }
 
+                # Check for builtins
                 if ($args[0] eq "\"cd\"" && scalar @args == 2) {
                     $usedImports{"os"} = 1;
                     if (!$isCommandGlobbed) {
@@ -144,10 +150,25 @@ sub convert {
                     $usedImports{"sys"} = 1;
                     $variableTypes{$var} = "string"; # XXX: Assume user doesn't want any globbing
                     return "$var = sys.stdin.readline().strip(); ";
-                } else {
-                    $usedBuiltins{"call"} = 1;
-                    return "call(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
+                } elsif (($args[0] eq "\"test\"" || $args[0] eq "\"[\"" && $args[-1] eq "\"]\"") && !$isCommandGlobbed) {
+                    my @argsCopy = @args; # Don't modify arguments if parser fails
+                    shift @argsCopy;
+
+                    my $testParser = new ShPyTestParser;
+                    $testParser->YYData->{"ARGS"} = \@argsCopy;
+
+                    my $result = $testParser->YYParse(yylex => \&ShPyTestParser::Lexer, yyerror => sub {});
+                    if ($testParser->YYNberr() == 0) {
+                        foreach my $import (keys %{$testParser->YYData->{"usedImports"}}) {
+                            $usedImports{$import} = 1;
+                        }
+                        return $result . "; ";
+                    }
                 }
+
+                # Fallback to normal subprocess call
+                $usedBuiltins{"call"} = 1;
+                return "call(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
             } elsif ($simpleCommand->{"assignment"}) {
                 # Variable assignment
                 return join("; ", map {
