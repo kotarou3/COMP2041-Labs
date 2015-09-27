@@ -456,6 +456,9 @@ sub convert {
 sub postProcess {
     my ($result) = @ARG;
 
+    # Remove redundant int casting
+    $result =~ s/[^a-zA-Z0-9_]\Kint\("([0-9]+)"\)/$1/g;
+
     # Remove trailing spaces and semicolons
     $result =~ s/[; ]+$//mg;
 
