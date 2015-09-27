@@ -1,19 +1,23 @@
 #!/bin/sh
 
-# call(sorted(glob.glob("./[*][[][]][?][.]*?")) + sorted(glob.glob("[*][[][]][?][.]*?")))
-./\*\[\]\?[.]*? '*[]?'[.]*?
+# call(sorted(glob.glob("./[*][[][]][?][.]*?")) + sorted(glob.glob("[*][[][]][?][.]*?")) + ["[a"] + sorted(glob.glob("]*")))
+./\*\[\]\?[.]*? '*[]?'[.]*? [a ]*
 
-# print " ".join(["a"] + sorted(glob.glob("./[*][[][]][?][.]*?")) + ["b", "c"] + sorted(glob.glob("[*][[][]][?][.]*?")) + ["d"])
-echo a ./\*\[\]\?[.]*? b c '*[]?'[.]*? d
+# print " ".join(["a"] + sorted(glob.glob("./[*][[][]][?][.]*?")) + ["b", "c"] + sorted(glob.glob("[*][[][]][?][.]*?")) + ["[a"] + sorted(glob.glob("]*")) + ["d"])
+echo a ./\*\[\]\?[.]*? b c '*[]?'[.]*? [a ]* d
+
+# XXX: Fails
+# print " ".join(sorted(glob.glob("[[]a[[]*")))
+echo [a\[*
 
 # a = "./*[?][.]*?"
 # b = "./\\*\\[\\?\\][.]*?"
-# c = "a"
+# c = "[a"
 # print " ".join(["a"] + sorted(glob.glob(a)) + ["b", "c"] + sorted(glob.glob(b)) + ["d", c, "e"])
 # call(["a"] + sorted(glob.glob(a)) + ["b", "c"] + sorted(glob.glob(b)) + ["d", c, "e"])
 a=./\*\[\?\][.]*?
 b='./\*\[\?\][.]*?'
-c=a
+c=[a
 echo a $a b c $b d $c e
 a $a b c $b d $c e
 

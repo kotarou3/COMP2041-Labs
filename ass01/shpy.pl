@@ -312,13 +312,13 @@ sub convert {
                     } elsif ($part->{"type"} eq "word_squoted") {
                         # Globbing doesn't happen in quotes and escapes, unless we're ignoring globbing
                         if ($ignoreGlobbing) {
-                            $part->{"value"} =~ /[]*?[]/ and $isGlobbed = 1;
+                            $part->{"value"} =~ /\[.[^]]*\]|[*?]/ and $isGlobbed = 1;
                         }
                     } else {
                         die("Should never happen");
                     }
                 } else {
-                    $part =~ /[]*?[]/ and $isGlobbed = 1;
+                    $part =~ /\[.[^]]*\]|[*?]/ and $isGlobbed = 1;
                 }
             }
 
