@@ -138,7 +138,7 @@ sub convert {
                     }
                 } elsif ($args[0] eq "\"exit\"" && scalar @args == 2 && !$isCommandGlobbed) {
                     $usedImports{"sys"} = 1;
-                    return "sys.exit(" . $args[1] . "); ";
+                    return "sys.exit(int(" . $args[1] . ")); ";
                 } elsif ($args[0] eq "\"read\"" && (scalar @args == 1 || scalar @args == 2 && $args[1] =~ /"([a-z_][a-z0-9_]*)"/i)) {
                     my $var;
                     if (scalar @args == 1) {
