@@ -1,4 +1,4 @@
-/* Converts the shell builtin `test` or `[` into python */
+/* Converts the GNU shell builtin `test` or `[` into python */
 
 %{
     use v5.10;
