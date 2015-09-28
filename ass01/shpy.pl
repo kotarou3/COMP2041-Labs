@@ -21,7 +21,7 @@ ShPyExprParser->import();
 sub convert {
     my ($rootNode) = @ARG;
 
-    my (%usedImports, %usedBuiltins);
+    my (%usedImports, %usedBuiltins, %usedEnvVars);
     my %variableTypes;
     my $isGlobbed = 0;
 
@@ -339,8 +339,15 @@ sub convert {
                             $part->{"value"} = "sys.argv[$1]";
                         }
 
-                        # If the variable has been "tainted" with a glob or is unknown, the entire word is globbed
-                        if (!defined $variableTypes{$part->{"value"}} || $variableTypes{$part->{"value"}} eq "glob") {
+                        # If the variable is unknown, mark it to pull from the environment
+                        # XXX: Assume user doesn't want it globbed
+                        if (!defined $variableTypes{$part->{"value"}}) {
+                            $usedEnvVars{$part->{"value"}} = 1;
+                            $variableTypes{$part->{"value"}} = "string";
+                        }
+
+                        # If the variable has been "tainted" with a glob, the entire word is globbed
+                        if ($variableTypes{$part->{"value"}} eq "glob") {
                             $isGlobbed = 1;
                         }
                     } elsif ($part->{"type"} eq "word_squoted") {
@@ -448,6 +455,13 @@ sub convert {
             die("Should never happen");
         }
     } keys %usedBuiltins;
+
+    # Pull in environment variables used
+    if (scalar keys %usedEnvVars > 0) {
+        $usedImports{"os"} = 1;
+        push(@builtins, map {"$_ = os.getenv(\"$_\", \"\")"} keys %usedEnvVars);
+        push(@builtins, "\n");
+    }
 
     # Generate imports
     if (scalar keys %usedImports > 0) {
