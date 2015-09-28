@@ -6,7 +6,7 @@
 # print " ".join(["a"] + sorted(glob.glob("./[*][[][]][?][.]*?")) + ["b", "c"] + sorted(glob.glob("[*][[][]][?][.]*?")) + ["[a"] + sorted(glob.glob("]*")) + ["d"])
 echo a ./\*\[\]\?[.]*? b c '*[]?'[.]*? [a ]* d
 
-# XXX: Fails
+# FIXME: Fails
 # print " ".join(sorted(glob.glob("[[]a[[]*")))
 echo [a\[*
 
