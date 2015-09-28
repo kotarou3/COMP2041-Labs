@@ -490,7 +490,7 @@ sub postProcess {
     $result =~ s/[; ]+$//mg;
 
     # Remove double blank lines
-    $result =~ s/\n{3,}/\n/g;
+    $result =~ s/\n{3,}/\n\n/g;
 
     # Remove all but one trailing newlines (or add it in if it doesn't exist)
     $result =~ s/\n+$//;
