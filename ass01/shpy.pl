@@ -6,16 +6,17 @@ use warnings;
 use English;
 
 # Recompile parsers if they're out of date
-if ((-M "ShPyParser.pm" || "inf") > -M "ShPyParser.yp") {
-    system("yapp ShPyParser.yp");
-}
-if ((-M "ShPyTestParser.pm" || "inf") > -M "ShPyTestParser.yp") {
-    system("yapp ShPyTestParser.yp");
+foreach my $parser ("ShPyParser", "ShPyTestParser", "ShPyExprParser") {
+    if ((-M "$parser.pm" || "inf") > -M "$parser.yp") {
+        system("yapp $parser.yp");
+    }
 }
 require ShPyParser;
 require ShPyTestParser;
+require ShPyExprParser;
 ShPyParser->import();
 ShPyTestParser->import();
+ShPyExprParser->import();
 
 sub convert {
     my ($rootNode) = @ARG;
@@ -139,6 +140,18 @@ sub convert {
                 } elsif ($args[0] eq "\"exit\"" && scalar @args == 2 && !$isCommandGlobbed) {
                     $usedImports{"sys"} = 1;
                     return "sys.exit(int(" . $args[1] . ")); ";
+                } elsif ($args[0] eq "\"expr\"" && !$isCommandGlobbed) {
+                    my @argsCopy = @args; # Don't modify arguments if parser fails
+                    shift @argsCopy;
+
+                    my $exprParser = new ShPyExprParser;
+                    $exprParser->YYData->{"ARGS"} = \@argsCopy;
+
+                    my $result = $exprParser->YYParse(yylex => \&ShPyExprParser::Lexer, yyerror => sub {});
+                    if ($exprParser->YYNberr() == 0) {
+                        $result =~ /(?:[<=>]| and | or )/ and $result = "+($result)";
+                        return "print $result; ";
+                    }
                 } elsif ($args[0] eq "\"read\"" && (scalar @args == 1 || scalar @args == 2 && $args[1] =~ /"([a-z_][a-z0-9_]*)"/i)) {
                     my $var;
                     if (scalar @args == 1) {

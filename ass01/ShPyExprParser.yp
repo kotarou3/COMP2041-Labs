@@ -1,0 +1,90 @@
+/* Converts the POSIX `expr` into python (except the : operator) */
+
+%{
+    use v5.10;
+    use strict;
+    use warnings;
+    use English;
+
+    sub Lexer {
+        my %tokenTypes = (
+            "\"|\"" => "|",
+            "\"&\"" => "&",
+            "\"<\"" => "<",
+            "\"<=\"" => "LESSEQUAL",
+            "\"=\"" => "=",
+            "\"!=\"" => "NEQUAL",
+            "\">=\"" => "GREATEQUAL",
+            "\">\"" => ">",
+            "\"+\"" => "+",
+            "\"-\"" => "-",
+            "\"*\"" => "*",
+            "\"/\"" => "/",
+            "\"%\"" => "%",
+            "\"(\"" => "(",
+            "\")\"" => ")"
+        );
+
+        if (scalar @{$ARG[0]->YYData->{"ARGS"}}) {
+            my $token = shift(@{$ARG[0]->YYData->{"ARGS"}});
+            my $type = $tokenTypes{$token} || "TOKEN";
+            return ($type, $token);
+        } else {
+            return ("", undef);
+        }
+    }
+
+    sub fixComparison {
+        # Python's `a comparison b comparison c` is the equivalent of
+        # `a comparison b and b comparison c`, while expr's isn't, so fix that.
+        # XXX: Heuristic; Could do better, but adds complexity
+        $ARG[0] =~ /[<=>]/ and return "(" . $ARG[0] . ")";
+        return $ARG[0];
+    }
+%}
+
+%token TOKEN
+%token LESSEQUAL NEQUAL GREATEQUAL
+
+%left '|'
+%left '&'
+%left '<' LESSEQUAL '=' NEQUAL GREATEQUAL '>'
+%left '+' '-'
+%left '*' '/' '%'
+
+%start expression
+%%
+expression : token
+           | expression '|' expression
+               {$ARG[1] . " or " . $ARG[3];}
+           | expression '&' expression
+               {$ARG[1] . " and " . $ARG[3];}
+           | expression '<' expression
+               {fixComparison($ARG[1]) . " < " . $ARG[3];}
+           | expression LESSEQUAL expression
+               {fixComparison($ARG[1]) . " <= " . $ARG[3];}
+           | expression '=' expression
+               {fixComparison($ARG[1]) . " == " . $ARG[3];}
+           | expression NEQUAL expression
+               {fixComparison($ARG[1]) . " != " . $ARG[3];}
+           | expression GREATEQUAL expression
+               {fixComparison($ARG[1]) . " >= " . $ARG[3];}
+           | expression '>' expression
+               {fixComparison($ARG[1]) . " > " . $ARG[3];}
+           | expression '+' expression
+               {$ARG[1] . " + " . $ARG[3];}
+           | expression '-' expression
+               {$ARG[1] . " - " . $ARG[3];}
+           | expression '*' expression
+               {$ARG[1] . " * " . $ARG[3];}
+           | expression '/' expression
+               {$ARG[1] . " / " . $ARG[3];}
+           | expression '%' expression
+               {$ARG[1] . " % " . $ARG[3];}
+           | '(' expression ')'
+               {"(" . $ARG[2] . ")";}
+           ;
+token      : TOKEN
+               {"int(" . $ARG[1] . ")";}
+           ;
+%%
