@@ -158,8 +158,10 @@
             ($tokenType, $tokenValue) = @{shift(@{$ARG[0]->YYData->{"queuedTokens"}})};
         } else {
             # Whitespace is ignored (outside of quotes)
-            if ($ARG[0]->YYData->{"DATA"} =~ s/^([ \t]+)//) {
-                $ARG[0]->YYData->{"isInWord"} = 0;
+            if ($ARG[0]->YYData->{"DATA"} =~ s/^((?:[ \t]|\\\n)+)//) {
+                if ($1 =~ /[ \t]/) {
+                    $ARG[0]->YYData->{"isInWord"} = 0;
+                }
             }
 
             if (length $ARG[0]->YYData->{"DATA"} == 0) {
