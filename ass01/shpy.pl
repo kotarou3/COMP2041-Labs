@@ -36,6 +36,8 @@ sub convert {
     for (my $n = 0; $n < 10; ++$n) {
         $variableTypes{"sys.argv[$n]"} = "string";
     }
+    $variableTypes{"\" \".join(sys.argv[1:])"} = "string";
+    $variableTypes{"len(sys.argv[1:])"} = "string";
 
     my $globsToPythonList = sub {
         # Glob each element of $args depending on the flag in $globbedArgs
@@ -422,10 +424,16 @@ sub convert {
             foreach my $part (@$word) {
                 if (ref($part) eq "HASH") {
                     if ($part->{"type"} eq "variable") {
-                        # Check for command arguments ($0..$9)
+                        # Check for command arguments ($0..$9, $@, $*, $#)
                         if ($part->{"value"} =~ /^([0-9])$/) {
                             $usedImports->{"sys"} = 1;
                             $part->{"value"} = "sys.argv[$1]";
+                        } elsif ($part->{"value"} =~ /^([@*])$/) {
+                            $usedImports->{"sys"} = 1;
+                            $part->{"value"} = "\" \".join(sys.argv[1:])";
+                        } elsif ($part->{"value"} eq "#") {
+                            $usedImports->{"sys"} = 1;
+                            $part->{"value"} = "len(sys.argv[1:])";
                         }
 
                         # If the variable is unknown, mark it to pull from the environment
