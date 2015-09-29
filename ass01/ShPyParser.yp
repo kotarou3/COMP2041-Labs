@@ -39,6 +39,20 @@
             "\$(" => "COMMAND_SUB_START"
         });
 
+        # When in double quotes, it has delimiters of its own
+        if ($ARG[0]->YYData->{"stateStack"}->[-1] eq "dquotes") {
+            @delimiters = ({
+                # Single character delimiters
+                "\\" => "ESCAPE",
+                "\"" => "DQUOTE",
+                ")" => ")",
+                "`" => "`"
+            }, {
+                # Two character delimiters
+                "\$(" => "COMMAND_SUB_START"
+            });
+        }
+
         # Find the next delimiter
         my ($nextDelim, $nextDelimType, $nextDelimIndex);
         $nextDelimIndex = length $ARG[0]->YYData->{"DATA"};
@@ -68,6 +82,11 @@
         }
 
         if ($nextDelimIndex != 0) {
+            # No special processing needed if in double quotes
+            if ($ARG[0]->YYData->{"stateStack"}->[-1] eq "dquotes") {
+                return ("WORD", substr($ARG[0]->YYData->{"DATA"}, 0, $nextDelimIndex, ""));
+            }
+
             # Another special case for variable assignments, with same reason as above
             $ARG[0]->YYData->{"DATA"} =~ s/^([a-z_][a-z0-9_]*)=//i and return ("VARIABLE_ASSIGNMENT", $1);
 
@@ -114,9 +133,6 @@
             $ARG[0]->YYData->{"DATA"} =~ s/^'([^']*)'// and return ("WORD_SQUOTED", $1);
             error($ARG[0], "unexpected EOF while looking for matching `''");
             return ("", undef);
-        } elsif ($nextDelimType eq "DQUOTE") {
-            error($ARG[0], "Double quotes are currently not supported");
-            return ("", undef);
         } elsif ($nextDelimType eq "`") {
             # XXX: Hack to make grammar unambiguous
             my $state = $ARG[0]->YYData->{"stateStack"};
@@ -134,7 +150,7 @@
         return ($nextDelimType, $nextDelim);
     }
 
-    sub Lexer {
+    sub lex {
         my %reservedWordTypes = (
             "If" => 1,
             "Then" => 1,
@@ -154,7 +170,7 @@
             "NAME" => 1,
             "WORD" => 1,
             "WORD_SQUOTED" => 1,
-            "WORD_DQUOTED" => 1,
+            "DQUOTE" => 1,
             "VARIABLE" => 1,
             "VARIABLE_ASSIGNMENT" => 1,
             "ESCAPED" => 1,
@@ -165,6 +181,8 @@
         if (!$ARG[0]->YYData->{"stateStack"}) {
             $ARG[0]->YYData->{"stateStack"} = ["top"];
         }
+        my $stateStack = $ARG[0]->YYData->{"stateStack"};
+
         if (!$ARG[0]->YYData->{"queuedTokens"}) {
             $ARG[0]->YYData->{"queuedTokens"} = [];
         }
@@ -174,9 +192,11 @@
             ($tokenType, $tokenValue) = @{shift(@{$ARG[0]->YYData->{"queuedTokens"}})};
         } else {
             # Whitespace is ignored (outside of quotes)
-            if ($ARG[0]->YYData->{"DATA"} =~ s/^((?:[ \t]|\\\n)+)//) {
-                if ($1 =~ /[ \t]/ && $ARG[0]->YYData->{"stateStack"}->[-1] eq "word") {
-                    pop(@{$ARG[0]->YYData->{"stateStack"}});
+            if ($stateStack->[-1] ne "dquotes") {
+                if ($ARG[0]->YYData->{"DATA"} =~ s/^((?:[ \t]|\\\n)+)//) {
+                    if ($1 =~ /[ \t]/ && $stateStack->[-1] eq "word") {
+                        pop(@$stateStack);
+                    }
                 }
             }
 
@@ -187,8 +207,17 @@
             ($tokenType, $tokenValue) = getNextToken($ARG[0]);
         }
 
+        # Double quotes are never sent to the parser - they're implemented as a delimiter change in the lexer
+        if ($tokenType eq "DQUOTE" && ($stateStack->[-1] eq "dquotes" || $stateStack->[-1] eq "word" && $stateStack->[-2] eq "dquotes")) {
+            if ($stateStack->[-1] eq "word") {
+                pop(@$stateStack);
+            }
+            pop(@$stateStack);
+            return lex($ARG[0]);
+        }
+
         # A new word starting with a reserved word and not a reserved word is marked as a normal word to help with parsing
-        if ($ARG[0]->YYData->{"stateStack"}->[-1] ne "word" && $reservedWordTypes{$tokenType} && $ARG[0]->YYData->{"DATA"} =~ /^[^ \t]/) {
+        if ($stateStack->[-1] ne "word" && $reservedWordTypes{$tokenType} && $ARG[0]->YYData->{"DATA"} =~ /^[^ \t]/) {
             my ($nextTokenType, $nextTokenValue) = getNextToken($ARG[0]);
             push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$nextTokenType, $nextTokenValue]);
 
@@ -199,18 +228,37 @@
 
         # If this is the second "word" type token in a row, insert a WORD_CONTINUATION in between
         if ($reservedWordTypes{$tokenType} || $otherWordTypes{$tokenType}) {
-            if ($ARG[0]->YYData->{"stateStack"}->[-1] eq "word") {
+            if ($stateStack->[-1] eq "word") {
                 push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$tokenType, $tokenValue]);
-                pop(@{$ARG[0]->YYData->{"stateStack"}}); # Don't infinitely return WORD_CONTINUATIONs
+                pop(@$stateStack); # Don't infinitely return WORD_CONTINUATIONs
                 return ("WORD_CONTINUATION", "");
             } else {
-                push(@{$ARG[0]->YYData->{"stateStack"}}, "word");
+                push(@$stateStack, "word");
             }
-        } elsif ($ARG[0]->YYData->{"stateStack"}->[-1] eq "word") {
-            pop(@{$ARG[0]->YYData->{"stateStack"}});
+        } elsif ($stateStack->[-1] eq "word") {
+            pop(@$stateStack);
+        }
+
+        if ($tokenType eq "DQUOTE") {
+            push(@$stateStack, "dquotes");
+            return lex($ARG[0]);
         }
 
         return ($tokenType, $tokenValue);
+    }
+
+    sub Lexer {
+        my ($type, $value) = lex($ARG[0]);
+
+        # Deduplicate WORD_CONTINUATIONs - happens for chained double quotes
+        if ($type eq "WORD_CONTINUATION" &&
+            $ARG[0]->YYData->{"lastToken"} &&
+            $ARG[0]->YYData->{"lastToken"}->[0] eq "WORD_CONTINUATION") {
+            return Lexer($ARG[0]);
+        }
+        $ARG[0]->YYData->{"lastToken"} = [$type, $value];
+
+        return ($type, $value);
     }
 
     sub createNode {
