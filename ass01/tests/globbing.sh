@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# call(sorted(glob.glob("./[*][[][]][?][.]*?")) + sorted(glob.glob("[*][[][]][?][.]*?")) + ["[a"] + sorted(glob.glob("]*")))
+# subprocess.call(sorted(glob.glob("./[*][[][]][?][.]*?")) + sorted(glob.glob("[*][[][]][?][.]*?")) + ["[a"] + sorted(glob.glob("]*")))
 ./\*\[\]\?[.]*? '*[]?'[.]*? [a ]*
 
 # print " ".join(["a"] + sorted(glob.glob("./[*][[][]][?][.]*?")) + ["b", "c"] + sorted(glob.glob("[*][[][]][?][.]*?")) + ["[a"] + sorted(glob.glob("]*")) + ["d"])
@@ -14,7 +14,7 @@ echo [a\[*
 # b = "./\\*\\[\\?\\][.]*?"
 # c = "[a"
 # print " ".join(["a"] + sorted(glob.glob(a)) + ["b", "c"] + sorted(glob.glob(b)) + ["d", c, "e"])
-# call(["a"] + sorted(glob.glob(a)) + ["b", "c"] + sorted(glob.glob(b)) + ["d", c, "e"])
+# subprocess.call(["a"] + sorted(glob.glob(a)) + ["b", "c"] + sorted(glob.glob(b)) + ["d", c, "e"])
 a=./\*\[\?\][.]*?
 b='./\*\[\?\][.]*?'
 c=[a

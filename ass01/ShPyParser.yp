@@ -26,7 +26,8 @@
             "(" => "(",
             ")" => ")",
             ">" => ">",
-            "<" => "<"
+            "<" => "<",
+            "`" => "`"
         }, {
             # Two character delimiters
             "&&" => "AND_IF",
@@ -34,7 +35,8 @@
             ";;" => "DSEMI",
             "<<" => "DLESS",
             ">>" => "DGREAT",
-            "<>" => "LESSGREAT"
+            "<>" => "LESSGREAT",
+            "\$(" => "COMMAND_SUB_START"
         });
 
         # Find the next delimiter
@@ -115,12 +117,21 @@
         } elsif ($nextDelimType eq "DQUOTE") {
             error($ARG[0], "Double quotes are currently not supported");
             return ("", undef);
+        } elsif ($nextDelimType eq "`") {
+            # XXX: Hack to make grammar unambiguous
+            my $state = $ARG[0]->YYData->{"stateStack"};
+            if ($state->[-1] eq "cmd_sub_`" ||
+                scalar @$state >= 2 && $state->[-2] eq "cmd_sub_`" && $state->[-1] eq "word") {
+                $nextDelimType = "BACKTICK_END";
+            } else {
+                $nextDelimType = "BACKTICK_START";
+            }
         } elsif ($nextDelimType eq "SPACE") {
             die("Should never happen");
-        } else {
-            substr($ARG[0]->YYData->{"DATA"}, 0, length $nextDelim, "");
-            return ($nextDelimType, $nextDelim);
         }
+
+        substr($ARG[0]->YYData->{"DATA"}, 0, length $nextDelim, "");
+        return ($nextDelimType, $nextDelim);
     }
 
     sub Lexer {
@@ -146,9 +157,14 @@
             "WORD_DQUOTED" => 1,
             "VARIABLE" => 1,
             "VARIABLE_ASSIGNMENT" => 1,
-            "ESCAPED" => 1
+            "ESCAPED" => 1,
+            "COMMAND_SUB_START" => 1, # End handled in parser
+            "BACKTICK_START" => 1
         );
 
+        if (!$ARG[0]->YYData->{"stateStack"}) {
+            $ARG[0]->YYData->{"stateStack"} = ["top"];
+        }
         if (!$ARG[0]->YYData->{"queuedTokens"}) {
             $ARG[0]->YYData->{"queuedTokens"} = [];
         }
@@ -159,8 +175,8 @@
         } else {
             # Whitespace is ignored (outside of quotes)
             if ($ARG[0]->YYData->{"DATA"} =~ s/^((?:[ \t]|\\\n)+)//) {
-                if ($1 =~ /[ \t]/) {
-                    $ARG[0]->YYData->{"isInWord"} = 0;
+                if ($1 =~ /[ \t]/ && $ARG[0]->YYData->{"stateStack"}->[-1] eq "word") {
+                    pop(@{$ARG[0]->YYData->{"stateStack"}});
                 }
             }
 
@@ -169,10 +185,10 @@
             }
 
             ($tokenType, $tokenValue) = getNextToken($ARG[0]);
-         }
+        }
 
         # A new word starting with a reserved word and not a reserved word is marked as a normal word to help with parsing
-        if (!$ARG[0]->YYData->{"isInWord"} && $reservedWordTypes{$tokenType} && $ARG[0]->YYData->{"DATA"} =~ /^[^ \t]/) {
+        if ($ARG[0]->YYData->{"stateStack"}->[-1] ne "word" && $reservedWordTypes{$tokenType} && $ARG[0]->YYData->{"DATA"} =~ /^[^ \t]/) {
             my ($nextTokenType, $nextTokenValue) = getNextToken($ARG[0]);
             push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$nextTokenType, $nextTokenValue]);
 
@@ -183,15 +199,15 @@
 
         # If this is the second "word" type token in a row, insert a WORD_CONTINUATION in between
         if ($reservedWordTypes{$tokenType} || $otherWordTypes{$tokenType}) {
-            if ($ARG[0]->YYData->{"isInWord"}) {
+            if ($ARG[0]->YYData->{"stateStack"}->[-1] eq "word") {
                 push(@{$ARG[0]->YYData->{"queuedTokens"}}, [$tokenType, $tokenValue]);
-                $ARG[0]->YYData->{"isInWord"} = 0; # Don't infinitely return WORD_CONTINUATIONs
+                pop(@{$ARG[0]->YYData->{"stateStack"}}); # Don't infinitely return WORD_CONTINUATIONs
                 return ("WORD_CONTINUATION", "");
             } else {
-                $ARG[0]->YYData->{"isInWord"} = 1;
+                push(@{$ARG[0]->YYData->{"stateStack"}}, "word");
             }
-        } else {
-            $ARG[0]->YYData->{"isInWord"} = 0;
+        } elsif ($ARG[0]->YYData->{"stateStack"}->[-1] eq "word") {
+            pop(@{$ARG[0]->YYData->{"stateStack"}});
         }
 
         return ($tokenType, $tokenValue);
@@ -242,6 +258,9 @@
 %token  WORD
 %token  WORD_SQUOTED
 %token  WORD_CONTINUATION
+%token  COMMAND_SUB_START
+%token  BACKTICK_START
+%token  BACKTICK_END
 %token  NAME
 %token  NEWLINE
 %token  SL_COMMENT
@@ -251,7 +270,7 @@
 %token  VARIABLE_ASSIGNMENT
 %token  ESCAPED
 
-/* The following are the operators mentioned above. */
+/* The following are the operators. */
 
 %token  AND_IF    OR_IF    DSEMI
 /*      '&&'      '||'     ';;'    */
@@ -513,9 +532,25 @@ word_no_assign   :                                  word_part
                  | word_no_assign WORD_CONTINUATION VARIABLE_ASSIGNMENT
                      {appendNode($ARG[1], $ARG[3] . "=");}
                  ;
+begin_cmd_sub    : /* empty; used to change lexer state */
+                     {push(@{$ARG[0]->YYData->{"stateStack"}}, "cmd_sub_\$(");}
+                 ;
+end_cmd_sub      : /* empty; used to change lexer state */
+                     {pop(@{$ARG[0]->YYData->{"stateStack"}}) eq "cmd_sub_\$(" or die("Should never happen");}
+                 ;
+begin_cmd_sub_bt : /* empty; used to change lexer state */
+                     {push(@{$ARG[0]->YYData->{"stateStack"}}, "cmd_sub_`");}
+                 ;
+end_cmd_sub_bt   : /* empty; used to change lexer state */
+                     {pop(@{$ARG[0]->YYData->{"stateStack"}}) eq "cmd_sub_`" or die("Should never happen");}
+                 ;
 word_part        : WORD
                  | WORD_SQUOTED
                      {createLeaf("word_squoted", $ARG[1]);}
+                 | COMMAND_SUB_START begin_cmd_sub file ')' end_cmd_sub
+                     {$ARG[3];}
+                 | BACKTICK_START begin_cmd_sub_bt file BACKTICK_END end_cmd_sub_bt
+                     {$ARG[3];}
                  | VARIABLE
                      {createLeaf("variable", $ARG[1]);}
                  | NAME

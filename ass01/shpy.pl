@@ -19,11 +19,18 @@ ShPyTestParser->import();
 ShPyExprParser->import();
 
 sub convert {
-    my ($rootNode) = @ARG;
+    my ($rootNode, $parentShell) = @ARG;
 
-    my (%usedImports, %usedBuiltins, %usedEnvVars);
-    my %variableTypes;
+    my ($usedImports, $usedBuiltins) = ({}, {});
+    my (%variableTypes, %unknownVars);
+    my %subshells;
     my $isGlobbed = 0;
+
+    if ($parentShell) {
+        $usedImports = $parentShell->{"usedImports"};
+        $usedBuiltins = $parentShell->{"usedBuiltins"};
+        %variableTypes = %{$parentShell->{"variableTypes"}}
+    }
 
     # XXX: Assume command arguments don't need to be globbed
     for (my $n = 0; $n < 10; ++$n) {
@@ -46,7 +53,7 @@ sub convert {
                 }
                 push(@result, "[" . join(", ", @currentUnglobbedRun) . "]");
             } else {
-                $usedImports{"glob"} = 1;
+                $usedImports->{"glob"} = 1;
                 push(@result, "sorted(glob.glob(" . shift(@args) . "))");
                 shift(@globbedArgs);
             }
@@ -60,6 +67,17 @@ sub convert {
     %action = (
         "list" => sub {
             my ($list) = @ARG;
+
+            # If the return value is needed, mark the last and_or for return value capture
+            if ($list->{"captureReturn"}) {
+                for (my $c = scalar @{$list->{"children"}}; $c > 0; --$c) {
+                    if ($list->{"children"}[$c - 1]->{"type"} eq "and_or") {
+                        $list->{"children"}[$c - 1]->{"captureReturn"} = 1;
+                        last;
+                    }
+                }
+            }
+
             my @result = &$doDefaultNext($list);
 
             # Remove semicolons if a comment immediately follows
@@ -79,6 +97,15 @@ sub convert {
 
         "and_or" => sub {
             my ($andOr) = @ARG;
+
+            # Mark all child pipe_sequences except the last for return value capture, unless the parent needs it
+            for (my $c = 0; $c < scalar @{$andOr->{"children"}} - 1 + ($andOr->{"captureReturn"} || 0); ++$c) {
+                if ($andOr->{"children"}[$c]->{"type"} eq "pipe_sequence" ||
+                    $andOr->{"children"}[$c]->{"type"} eq "not") {
+                    $andOr->{"children"}[$c]->{"captureReturn"} = 1;
+                }
+            }
+
             if (scalar @{$andOr->{"children"}} > 1) {
                 print(STDERR "Warning: && and || are currently unsupported\n");
             }
@@ -87,12 +114,18 @@ sub convert {
 
         "not" => sub {
             my ($not) = @ARG;
+            $not->{"captureReturn"} = $not->{"value"}->{"captureReturn"};
+
             print(STDERR "Warning: ! is currently unsupported\n");
             return &$doDefaultNext($not);
         },
 
         "pipe_sequence" => sub {
             my ($pipeSequence) = @ARG;
+
+            # Only the return value of the last command is important
+            $pipeSequence->{"children"}[-1]->{"captureReturn"} = $pipeSequence->{"captureReturn"};
+
             if (scalar @{$pipeSequence->{"children"}} > 1) {
                 print(STDERR "Warning: Pipes are currently unsupported\n");
             }
@@ -101,6 +134,7 @@ sub convert {
 
         "simple_command" => sub {
             my ($simpleCommand) = @ARG;
+            my $isCapturingReturn = $simpleCommand->{"captureReturn"};
             $simpleCommand = $simpleCommand->{"value"};
 
             if ($simpleCommand->{"command"}) {
@@ -121,25 +155,42 @@ sub convert {
                 }
 
                 # Check for builtins
-                if ($args[0] eq "\"cd\"" && scalar @args == 2) {
-                    $usedImports{"os"} = 1;
-                    if (!$isCommandGlobbed) {
-                        return "os.chdir(" . $args[1] . "); ";
+                if ($args[0] eq "\"cd\"") {
+                    if (scalar @args == 2) {
+                        $usedImports->{"os"} = 1;
+
+                        my $result = $isCapturingReturn ? "return not " : ""; # os.chdir() throws on failure any way...
+                        if (!$isCommandGlobbed) {
+                            $result .= "os.chdir(" . $args[1] . "); ";
+                        } else {
+                            $usedImports->{"glob"} = 1;
+                            $result .= "os.chdir(sorted(glob.glob(" . $args[1] . "))[0]); ";
+                        }
+                        return $result;
                     } else {
-                        $usedImports{"glob"} = 1;
-                        return "os.chdir(sorted(glob.glob(" . $args[1] . "))[0]); ";
+                        print(STDERR "Warning: `cd` builtin used but could not be translated\n");
                     }
                 } elsif ($args[0] eq "\"echo\"") {
                     shift @args;
                     shift @globbedArgs;
+
+                    my $result;
                     if (!$isCommandGlobbed) {
-                        return scalar @args > 0 ? "print " . join(", ", @args) . "; " : "print; ";
+                        $result = scalar @args > 0 ? "print " . join(", ", @args) . "; " : "print; ";
                     } else {
-                        return "print \" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
+                        $result = "print \" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
                     }
-                } elsif ($args[0] eq "\"exit\"" && scalar @args == 2 && !$isCommandGlobbed) {
-                    $usedImports{"sys"} = 1;
-                    return "sys.exit(int(" . $args[1] . ")); ";
+                    if ($isCapturingReturn) {
+                        $result .= "\nreturn True; ";
+                    }
+                    return $result;
+                } elsif ($args[0] eq "\"exit\"") {
+                    if (scalar @args == 2 && !$isCommandGlobbed) {
+                        $usedImports->{"sys"} = 1;
+                        return "sys.exit(int(" . $args[1] . ")); ";
+                    } else {
+                        print(STDERR "Warning: `exit` builtin used but could not be translated\n");
+                    }
                 } elsif ($args[0] eq "\"expr\"" && !$isCommandGlobbed) {
                     my @argsCopy = @args; # Don't modify arguments if parser fails
                     shift @argsCopy;
@@ -150,19 +201,33 @@ sub convert {
                     my $result = $exprParser->YYParse(yylex => \&ShPyExprParser::Lexer, yyerror => sub {});
                     if ($exprParser->YYNberr() == 0) {
                         $result =~ /(?:[<=>]| and | or )/ and $result = "+($result)";
-                        return "print $result; ";
+                        if ($isCapturingReturn) {
+                            return "__tmp = $result\nprint __tmp\nreturn __tmp; ";
+                        } else {
+                            return "print $result; ";
+                        }
                     }
-                } elsif ($args[0] eq "\"read\"" && (scalar @args == 1 || scalar @args == 2 && $args[1] =~ /"([a-z_][a-z0-9_]*)"/i)) {
-                    my $var;
-                    if (scalar @args == 1) {
-                        $var = "REPLY";
-                    } else {
-                        $var = $1;
-                    }
+                } elsif ($args[0] eq "\"read\"") {
+                    if (scalar @args == 1 || scalar @args == 2 && $args[1] =~ /"([a-z_][a-z0-9_]*)"/i) {
+                        my $var;
+                        if (scalar @args == 1) {
+                            $var = "REPLY";
+                        } else {
+                            $var = $1;
+                        }
 
-                    $usedImports{"sys"} = 1;
-                    $variableTypes{$var} = "string"; # XXX: Assume user doesn't want any globbing
-                    return "$var = sys.stdin.readline().strip(); ";
+                        $usedImports->{"sys"} = 1;
+                        $variableTypes{$var} = "string"; # XXX: Assume user doesn't want any globbing
+                        my $result = "$var = sys.stdin.readline().strip()";
+                        if ($isCapturingReturn) {
+                            print(STDERR "Warning: Python does not support variable assignment in conditional expressions. Output will be invalid\n");
+                            return "return ($result); ";
+                        } else {
+                            return "$result; ";
+                        }
+                    } else {
+                        print(STDERR "Warning: `read` builtin used but could not be translated\n");
+                    }
                 } elsif (($args[0] eq "\"test\"" || $args[0] eq "\"[\"" && $args[-1] eq "\"]\"") && !$isCommandGlobbed) {
                     my @argsCopy = @args; # Don't modify arguments if parser fails
                     shift @argsCopy;
@@ -173,18 +238,26 @@ sub convert {
                     my $result = $testParser->YYParse(yylex => \&ShPyTestParser::Lexer, yyerror => sub {});
                     if ($testParser->YYNberr() == 0) {
                         foreach my $import (keys %{$testParser->YYData->{"usedImports"}}) {
-                            $usedImports{$import} = 1;
+                            $usedImports->{$import} = 1;
                         }
-                        return $result . "; ";
+                        if ($isCapturingReturn) {
+                            return "return $result; ";
+                        } else {
+                            return "$result; ";
+                        }
                     }
                 }
 
                 # Fallback to normal subprocess call
-                $usedBuiltins{"call"} = 1;
-                return "call(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
+                $usedImports->{"subprocess"} = 1;
+                my $result = "subprocess.call(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
+                if ($isCapturingReturn) {
+                    $result = "return not $result";
+                }
+                return $result;
             } elsif ($simpleCommand->{"assignment"}) {
                 # Variable assignment
-                return join("; ", map {
+                my $result = join("; ", map {
                     my $value = $action{"word"}($_->{"value"}, 1);
                     if ($isGlobbed) {
                         # Globs are evaluated at command execution
@@ -194,7 +267,14 @@ sub convert {
                     }
 
                     $_->{"var"} . " = " . $value;
-                } @{$simpleCommand->{"assignment"}}) . "; ";
+                } @{$simpleCommand->{"assignment"}});
+
+                if ($isCapturingReturn) {
+                    print(STDERR "Warning: Python does not support variable assignment in conditional expressions. Output will be invalid\n");
+                    return "return ($result); ";
+                } else {
+                    return "$result; ";
+                }
             } else {
                 # Only IO redirection
                 print(STDERR "Warning: IO redirection currently unsupported\n");
@@ -204,6 +284,11 @@ sub convert {
 
         "compound_command" => sub {
             my ($compoundCommand) = @ARG;
+
+            if ($compoundCommand->{"captureReturn"}) {
+                print(STDERR "Warning: Capturing return value of compound commands is unsupported\n");
+            }
+
             return &$doDefaultNext($compoundCommand);
         },
 
@@ -250,8 +335,10 @@ sub convert {
 
             my $result = "";
             while (1) {
+                $ifClause->{"condition"}->{"captureReturn"} = 1;
                 my $condition = &$doDefault($ifClause->{"condition"});
                 $condition =~ s/;\s+$//;
+                $condition =~ s/^return //;
                 if ($condition =~ /[&;\n]/) {
                     print(STDERR "Warning: Multi-statement conditions not supported. Output might be invalid\n");
                 }
@@ -293,8 +380,10 @@ sub convert {
             my ($whileClause) = @ARG;
             $whileClause = $whileClause->{"value"};
 
+            $whileClause->{"condition"}->{"captureReturn"} = 1;
             my $condition = &$doDefault($whileClause->{"condition"});
             $condition =~ s/;\s+$//;
+            $condition =~ s/^return //;
             if ($condition =~ /[&;\n]/) {
                 print(STDERR "Warning: Multi-statement conditions not supported. Output might be invalid\n");
             }
@@ -335,14 +424,14 @@ sub convert {
                     if ($part->{"type"} eq "variable") {
                         # Check for command arguments ($0..$9)
                         if ($part->{"value"} =~ /^([0-9])$/) {
-                            $usedImports{"sys"} = 1;
+                            $usedImports->{"sys"} = 1;
                             $part->{"value"} = "sys.argv[$1]";
                         }
 
                         # If the variable is unknown, mark it to pull from the environment
                         # XXX: Assume user doesn't want it globbed
                         if (!defined $variableTypes{$part->{"value"}}) {
-                            $usedEnvVars{$part->{"value"}} = 1;
+                            $unknownVars{$part->{"value"}} = 1;
                             $variableTypes{$part->{"value"}} = "string";
                         }
 
@@ -355,6 +444,8 @@ sub convert {
                         if ($ignoreGlobbing) {
                             $part->{"value"} =~ /\[.[^]]*\]|[*?]/ and $isGlobbed = 1;
                         }
+                    } elsif ($part->{"type"} eq "list") {
+                        # XXX: Static checking is impossible here - assume user doesn't want to glob
                     } else {
                         die("Should never happen");
                     }
@@ -377,6 +468,37 @@ sub convert {
                         }
 
                         $_->{"value"};
+                    } elsif ($_->{"type"} eq "list") {
+                        # Command substitution executes in a subshell, so we use a function for that
+                        my $subshell = convert($_, {
+                            "usedImports" => $usedImports,
+                            "usedBuiltins" => $usedBuiltins,
+                            "variableTypes" => \%variableTypes
+                        });
+                        $subshell =~ s/;\s+$//;
+
+                        # If the command is simple enough, we don't need to use a full function
+                        my $isSimpleSubshell = 0;
+                        if (!($subshell =~ /[\n;]/)) {
+                            if ($subshell =~ s/^print //) {
+                                $subshell =~ /, / and $subshell = "\" \".join($subshell)";
+                                push(@variables, $subshell);
+                                $isSimpleSubshell = 1;
+                            } elsif ($subshell =~ s/^subprocess\.call\(//) {
+                                $usedBuiltins->{"callCapturingStdout"} = 1;
+                                push(@variables, "callCapturingStdout($subshell");
+                                $isSimpleSubshell = 1;
+                            }
+                        }
+                        if (!$isSimpleSubshell) {
+                            if (!$subshells{$subshell}) {
+                                $subshells{$subshell} = "subshell" . scalar keys %subshells;
+                            }
+                            $usedBuiltins->{"captureStdout"} = 1;
+                            push(@variables, "captureStdout(" . $subshells{$subshell} . ")");
+                        }
+
+                        "{" . (scalar @variables - 1) . "}";
                     }
                 } else {
                     $_;
@@ -434,7 +556,8 @@ sub convert {
 
     # Convert shebang if it exists
     my $hasShebang = 0;
-    if ($rootNode->{"children"}[0] &&
+    if (!$parentShell &&
+        $rootNode->{"children"}[0] &&
         $rootNode->{"children"}[0]->{"type"} eq "newline_list" &&
         $rootNode->{"children"}[0]->{"children"}[0] &&
         $rootNode->{"children"}[0]->{"children"}[0] =~ /^#!/) {
@@ -445,35 +568,84 @@ sub convert {
     # Do main conversion
     my $result = &$doDefault($rootNode);
 
-    # Generate builtins
-    my @builtins = map {
-        if ($_ eq "call") {
-            $usedImports{"subprocess"} = 1;
-            "def call(args):\n" .
-            "    return not subprocess.call(args)\n";
-        } else {
-            die("Should never happen");
-        }
-    } keys %usedBuiltins;
+    my @header;
 
-    # Pull in environment variables used
-    if (scalar keys %usedEnvVars > 0) {
-        $usedImports{"os"} = 1;
-        push(@builtins, map {"$_ = os.getenv(\"$_\", \"\")"} keys %usedEnvVars);
-        push(@builtins, "\n");
+    # Generate builtins
+    if (!$parentShell) {
+        push(@header, map {
+            if ($_ eq "callCapturingStdout") {
+                $usedImports->{"subprocess"} = 1;
+                "def callCapturingStdout(args):\n" .
+                "    try:\n" .
+                "        return subprocess.check_output(args)\n" .
+                "    except subprocess.CalledProcessError as e:\n" .
+                "        return e.output\n";
+            } elsif ($_ eq "captureStdout") {
+                $usedImports->{"os"} = 1;
+                $usedImports->{"sys"} = 1;
+                $usedImports->{"thread"} = 1;
+                "def captureStdout(function):\n" .
+                "    # Hackish way to do output capturing on arbritary subshells\n" .
+                "\n" .
+                "    # Set up new stdout\n" .
+                "    oldStdout = os.dup(1)\n" .
+                "    (newStdoutR, newStdoutW) = os.pipe()\n" .
+                "    os.dup2(newStdoutW, 1)\n" .
+                "    sys.stdout = os.fdopen(newStdoutW, \"w\")\n" .
+                "\n" .
+                "    # Run subshell in separate thread to avoid a pipe deadlock\n" .
+                "    def runSubshell():\n" .
+                "        function()\n" .
+                "\n" .
+                "        # Restore stdout\n" .
+                "        os.dup2(oldStdout, 1)\n" .
+                "        sys.stdout = os.fdopen(oldStdout, \"w\")\n" .
+                "\n" .
+                "    thread.start_new_thread(runSubshell, ())\n" .
+                "\n" .
+                "    # Read from the new\n" .
+                "    result = \"\"\n" .
+                "    while True:\n" .
+                "        buffer = os.read(newStdoutR, 0x1000)\n" .
+                "        result += buffer\n" .
+                "        if len(buffer) == 0:\n" .
+                "            break\n" .
+                "\n" .
+                "    os.close(newStdoutR)\n" .
+                "    return result\n";
+            } else {
+                die("Should never happen");
+            }
+        } keys %$usedBuiltins);
+    }
+
+    # Generate subshell functions
+    push(@header, map {
+        my $body = $_;
+        $body =~ /^\n/ or $body = "\n$body";
+        $body =~ /\n$/ or $body = "$body\n";
+        $body =~ s/^/    /gm;
+        "def " . $subshells{$_} . "():$body";
+    } keys %subshells);
+
+    # Pull in unknown variables used from the environment
+    if (scalar keys %unknownVars > 0) {
+        $usedImports->{"os"} = 1;
+        push(@header, map {"$_ = os.getenv(\"$_\", \"\")"} keys %unknownVars);
+        push(@header, "\n");
     }
 
     # Generate imports
-    if (scalar keys %usedImports > 0) {
-        unshift(@builtins, "import " . join(", ", keys %usedImports) . "\n");
+    if (!$parentShell && scalar keys %$usedImports > 0) {
+        unshift(@header, "import " . join(", ", keys %$usedImports) . "\n");
     }
 
     # Add builtins/imports to result
-    if (scalar @builtins > 0) {
+    if (scalar @header > 0) {
         if ($hasShebang) {
-            $result =~ s/\n\n?/"\n\n" . join("\n", @builtins) . "\n"/e;
+            $result =~ s/\n\n?/"\n\n" . join("\n", @header) . "\n"/e;
         } else {
-            $result = join("\n", @builtins) . "\n$result";
+            $result = join("\n", @header) . "\n$result";
         }
     }
 

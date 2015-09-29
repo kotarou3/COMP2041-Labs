@@ -2,7 +2,7 @@
 
 # (Modified from posh's test suite)
 # print "|&;<>()$`\\\"' \tThis a continuation\\\n#of\n the", "echo", "line" # and a multi-line comment \
-# call(["or", "not?"])
+# subprocess.call(["or", "not?"])
 echo \|\&\;\<\>\(\)\$\`\\\"\'\ \	\
 'This a c'on''''''tinuatio'n\
 #of
