@@ -370,9 +370,9 @@ list_opt_sep     : list
 and_or           :                         pipeline
                      {createNode("and_or", $ARG[1]);}
                  | and_or AND_IF linebreak pipeline
-                     {createNode("and_or", $ARG[1], $ARG[2], $ARG[3], $ARG[4]);}
+                     {appendNode($ARG[1], $ARG[2], $ARG[3], $ARG[4]);}
                  | and_or OR_IF  linebreak pipeline
-                     {createNode("and_or", $ARG[1], $ARG[2], $ARG[3], $ARG[4]);}
+                     {appendNode($ARG[1], $ARG[2], $ARG[3], $ARG[4]);}
                  ;
 pipeline         :      pipe_sequence
                      {$ARG[1];}

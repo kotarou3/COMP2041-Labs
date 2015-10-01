@@ -5,7 +5,11 @@
 # Stuff like this is almost perfect
 echo $(head -n5 /etc/passwd)
 
-# This translates ok
+if [ -u /bin/sh ] || [ -u /bin/bash ] && [ "$(whoami)" != "root" ]; then
+    echo $LOCALE
+fi
+
+# These translate ok
 A=1; B=2
 echo $(PATH=..; A=3; echo $(PATH=.; A=4; echo $A $B $PATH $PWD) $A $PATH $HOME) $A $PATH
 echo $A $PATH
@@ -35,3 +39,5 @@ if A=`echo 1; false`; then
 else
     echo $A
 fi
+
+true && A=1 || B=1

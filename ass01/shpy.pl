@@ -102,16 +102,63 @@ sub convert {
 
             # Mark all child pipe_sequences except the last for return value capture, unless the parent needs it
             for (my $c = 0; $c < scalar @{$andOr->{"children"}} - 1 + ($andOr->{"captureReturn"} || 0); ++$c) {
-                if ($andOr->{"children"}[$c]->{"type"} eq "pipe_sequence" ||
-                    $andOr->{"children"}[$c]->{"type"} eq "not") {
-                    $andOr->{"children"}[$c]->{"captureReturn"} = 1;
+                if (!ref($andOr->{"children"}[$c]) || $andOr->{"children"}[$c]->{"type"} eq "newline_list") {
+                    next;
                 }
+
+                $andOr->{"children"}[$c]->{"captureReturn"} = 1;
             }
 
-            if (scalar @{$andOr->{"children"}} > 1) {
-                print(STDERR "Warning: && and || are currently unsupported\n");
+            # Hoist comments to the front, since python doesn't support multiline conditionals
+            my @newlineList;
+
+            my $lastCondition;
+            my $result = "";
+            foreach my $child (@{$andOr->{"children"}}) {
+                if (!ref($child)) {
+                    if ($child eq "&&") {
+                        # Python has different operator precedence
+                        if ($lastCondition && $lastCondition eq "||") {
+                            $result =~ s/\s+$//;
+                            $result = "($result) ";
+                        }
+
+                        $result .= "and ";
+                    } else {
+                        $result .= "or ";
+                    }
+                    $lastCondition = $child;
+                } elsif ($child->{"type"} eq "newline_list") {
+                    push(@newlineList, @{$child->{"children"}});
+                } else {
+                    my $subshell = convert($child, {
+                        "usedImports" => $usedImports,
+                        "usedBuiltins" => $usedBuiltins,
+                        "variableTypes" => \%variableTypes,
+                        "unknownVars" => \%unknownVars
+                    });
+                    $subshell =~ s/;\s+$//;
+
+                    # If the command is simple enough, we don't need to use a full function
+                    if (scalar @{$andOr->{"children"}} == 1 || !($subshell =~ /[\n;]/) && $subshell =~ s/^return //) {
+                        $result .= "$subshell ";
+                        next;
+                    }
+
+                    if (!$subshells{$subshell}) {
+                        $subshells{$subshell} = "subshell" . scalar keys %subshells;
+                    }
+                    $result .= $subshells{$subshell} . "() ";
+                }
             }
-            return &$doDefault($andOr->{"children"}[0]);
+            $result =~ s/\s*$/; /;
+
+            my $comments = join("", @newlineList);
+            $comments =~ s/^\s+//;
+            $comments =~ s/\s+$/\n/;
+            $comments =~ s/\n\n+/\n/g;
+
+            return "$comments$result";
         },
 
         "not" => sub {
@@ -633,14 +680,25 @@ sub convert {
         $body =~ /^\n/ or $body = "\n$body";
         $body =~ /\n$/ or $body = "$body\n";
         $body =~ s/^/    /gm;
-        "def " . $subshells{$_} . "():$body";
+        "\ndef " . $subshells{$_} . "():$body";
     } keys %subshells);
 
     # Pull in unknown variables used from the environment
     if (scalar keys %unknownVars > 0) {
-        $usedImports->{"os"} = 1;
-        push(@header, map {"$_ = os.getenv(\"$_\", \"\")"} keys %unknownVars);
-        push(@header, "\n");
+        if (!$parentShell || !$parentShell->{"unknownVars"}) {
+            $usedImports->{"os"} = 1;
+            push(@header, map {"$_ = os.getenv(\"$_\", \"\")"} keys %unknownVars);
+            push(@header, "\n");
+        } else {
+            foreach my $var (keys %unknownVars) {
+                $parentShell->{"unknownVars"}->{$var} = 1;
+            }
+        }
+    }
+    if ($parentShell && $parentShell->{"unknownVars"}) {
+        foreach my $var (keys %variableTypes) {
+            $parentShell->{"variableTypes"}->{$var} = $variableTypes{$var};
+        }
     }
 
     # Generate imports
