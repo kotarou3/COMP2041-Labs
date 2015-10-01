@@ -18,6 +18,12 @@ ShPyParser->import();
 ShPyTestParser->import();
 ShPyExprParser->import();
 
+my $isPipelinesEnabled = 0;
+if ($ARGV[0] eq "-pipeline") {
+    $isPipelinesEnabled = 1;
+    shift(@ARGV);
+}
+
 sub convert {
     my ($rootNode, $parentShell) = @ARG;
 
@@ -175,10 +181,49 @@ sub convert {
             # Only the return value of the last command is important
             $pipeSequence->{"children"}[-1]->{"captureReturn"} = $pipeSequence->{"captureReturn"};
 
-            if (scalar @{$pipeSequence->{"children"}} > 1) {
-                print(STDERR "Warning: Pipes are currently unsupported\n");
+            if (!$isPipelinesEnabled && scalar @{$pipeSequence->{"children"}} > 1) {
+                print(STDERR "Warning: Pipes are not enabled. Enable with the -pipeline option\n");
+                $pipeSequence->{"children"} = [$pipeSequence->{"children"}[-1]];
             }
-            return &$doDefault($pipeSequence->{"children"}[0]);
+            if (scalar @{$pipeSequence->{"children"}} == 1) {
+                return &$doDefault($pipeSequence->{"children"}[0]);
+            }
+
+            # Hoist comments to the front, since python doesn't support multiline expressions
+            my @newlineList;
+
+            my @pipeline;
+            foreach my $child (@{$pipeSequence->{"children"}}) {
+                if ($child->{"type"} eq "newline_list") {
+                    push(@newlineList, @{$child->{"children"}});
+                } else {
+                    my $subshell = convert($child, {
+                        "usedImports" => $usedImports,
+                        "usedBuiltins" => $usedBuiltins,
+                        "variableTypes" => \%variableTypes,
+                        "unknownVars" => \%unknownVars
+                    });
+                    $subshell =~ s/;\s+$//;
+
+                    if (!$subshells{$subshell}) {
+                        $subshells{$subshell} = "subshell" . scalar keys %subshells;
+                    }
+                    push (@pipeline, $subshells{$subshell});
+                }
+            }
+
+            $usedBuiltins->{"pipeline"} = 1;
+            my $result = "pipeline(" . join(", ", @pipeline) . "); ";
+            if ($pipeSequence->{"captureReturn"}) {
+                $result = "return $result";
+            }
+
+            my $comments = join("", @newlineList);
+            $comments =~ s/^\s+//;
+            $comments =~ s/\s+$/\n/;
+            $comments =~ s/\n\n+/\n/g;
+
+            return "$comments$result";
         },
 
         "simple_command" => sub {
@@ -627,6 +672,11 @@ sub convert {
 
     # Generate builtins
     if (!$parentShell) {
+        foreach my $builtin (keys %$usedBuiltins) {
+            if ($builtin eq "pipeline") {
+                $usedBuiltins->{"captureStdout"} = 1;
+            }
+        }
         push(@header, map {
             if ($_ eq "callCapturingStdout") {
                 $usedImports->{"subprocess"} = 1;
@@ -636,29 +686,50 @@ sub convert {
                 "    except subprocess.CalledProcessError as e:\n" .
                 "        return e.output\n";
             } elsif ($_ eq "captureStdout") {
+                $usedImports->{"fcntl"} = 1;
                 $usedImports->{"os"} = 1;
                 $usedImports->{"sys"} = 1;
                 $usedImports->{"thread"} = 1;
-                "def captureStdout(function):\n" .
+                "def captureStdout(function, input = None):\n" .
                 "    # Hackish way to do output capturing on arbritary subshells\n" .
+                "\n" .
+                "    # Set up new stdin if needed\n" .
+                "    if input:\n" .
+                "        oldStdin = os.dup(0)\n" .
+                "        (newStdinR, newStdinW) = os.pipe()\n" .
+                "        fcntl.fcntl(newStdinW, fcntl.F_SETFD, fcntl.FD_CLOEXEC)\n" .
+                "        os.dup2(newStdinR, 0)\n" .
+                "        sys.stdin = os.fdopen(newStdinR, \"r\")\n" .
                 "\n" .
                 "    # Set up new stdout\n" .
                 "    oldStdout = os.dup(1)\n" .
                 "    (newStdoutR, newStdoutW) = os.pipe()\n" .
+                "    fcntl.fcntl(newStdoutR, fcntl.F_SETFD, fcntl.FD_CLOEXEC)\n" .
                 "    os.dup2(newStdoutW, 1)\n" .
                 "    sys.stdout = os.fdopen(newStdoutW, \"w\")\n" .
                 "\n" .
                 "    # Run subshell in separate thread to avoid a pipe deadlock\n" .
                 "    def runSubshell():\n" .
-                "        function()\n" .
+                "        try:\n" .
+                "            function()\n" .
+                "        finally:\n" .
+                "            # Restore stdin if needed\n" .
+                "            if input:\n" .
+                "                os.dup2(oldStdin, 0)\n" .
+                "                sys.stdin = os.fdopen(oldStdin, \"r\")\n" .
                 "\n" .
-                "        # Restore stdout\n" .
-                "        os.dup2(oldStdout, 1)\n" .
-                "        sys.stdout = os.fdopen(oldStdout, \"w\")\n" .
+                "            # Restore stdout\n" .
+                "            os.dup2(oldStdout, 1)\n" .
+                "            sys.stdout = os.fdopen(oldStdout, \"w\")\n" .
                 "\n" .
                 "    thread.start_new_thread(runSubshell, ())\n" .
                 "\n" .
-                "    # Read from the new\n" .
+                "    # Write to the new stdin if needed\n" .
+                "    if input:\n" .
+                "        os.write(newStdinW, input)\n" .
+                "        os.close(newStdinW)\n" .
+                "\n" .
+                "    # Read from the new stdout\n" .
                 "    result = \"\"\n" .
                 "    while True:\n" .
                 "        buffer = os.read(newStdoutR, 0x1000)\n" .
@@ -668,6 +739,41 @@ sub convert {
                 "\n" .
                 "    os.close(newStdoutR)\n" .
                 "    return result\n";
+            } elsif ($_ eq "pipeline") {
+                $usedImports->{"fcntl"} = 1;
+                $usedImports->{"threading"} = 1;
+                "def pipeline(*functions):\n" .
+                "    output = captureStdout(functions[0])\n" .
+                "    for function in functions[1:-1]:\n" .
+                "        output = captureStdout(function, input = output)\n" .
+                "\n" .
+                "    # Set up new stdin\n" .
+                "    oldStdin = os.dup(0)\n" .
+                "    (newStdinR, newStdinW) = os.pipe()\n" .
+                "    fcntl.fcntl(newStdinW, fcntl.F_SETFD, fcntl.FD_CLOEXEC)\n" .
+                "    os.dup2(newStdinR, 0)\n" .
+                "    sys.stdin = os.fdopen(newStdinR, \"r\")\n" .
+                "\n" .
+                "    # Run subshell in separate thread to avoid a pipe deadlock\n" .
+                "    result = [False]\n" .
+                "    def runSubshell():\n" .
+                "        try:\n" .
+                "            result[0] = functions[-1]()\n" .
+                "        finally:\n" .
+                "            # Restore stdin\n" .
+                "            os.dup2(oldStdin, 0)\n" .
+                "            sys.stdin = os.fdopen(oldStdin, \"r\")\n" .
+                "\n" .
+                "    t = threading.Thread(target = runSubshell)\n" .
+                "    t.start()\n" .
+                "\n" .
+                "    # Write to the new stdin\n" .
+                "    os.write(newStdinW, output)\n" .
+                "    os.close(newStdinW)\n" .
+                "\n" .
+                "    # Wait for subshell to return\n" .
+                "    t.join()\n" .
+                "    return result[0]\n";
             } else {
                 die("Should never happen");
             }
