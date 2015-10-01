@@ -19,7 +19,7 @@ ShPyTestParser->import();
 ShPyExprParser->import();
 
 my $isPipelinesEnabled = 0;
-if ($ARGV[0] eq "-pipeline") {
+if ($ARGV[0] && $ARGV[0] eq "-pipeline") {
     $isPipelinesEnabled = 1;
     shift(@ARGV);
 }
@@ -852,23 +852,17 @@ sub postProcess {
     return $result;
 }
 
-foreach my $file (@ARGV) {
-    my $document = do {
-        local $/ = undef;
-        open my $fh, "<", $file
-            or die "could not open $file: $!";
-        <$fh>;
-    };
+my $document = do {
+    local $/ = undef;
+    <STDIN>;
+};
 
-    my $parser = new ShPyParser;
-    $parser->YYData->{"DATA"} = $document;
+my $parser = new ShPyParser;
+$parser->YYData->{"DATA"} = $document;
 
-    my $result = $parser->YYParse(yylex => \&ShPyParser::Lexer);
-    if ($parser->YYNberr() == 0) {
-        $result = convert($result);
-        $result = postProcess($result);
-        print($result);
-    } else {
-        print STDERR "$file failed\n";
-    }
+my $result = $parser->YYParse(yylex => \&ShPyParser::Lexer);
+if ($parser->YYNberr() == 0) {
+    $result = convert($result);
+    $result = postProcess($result);
+    print($result);
 }
