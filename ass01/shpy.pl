@@ -687,9 +687,9 @@ sub convert {
                 $usedImports->{"subprocess"} = 1;
                 "def callCapturingStdout(args):\n" .
                 "    try:\n" .
-                "        return subprocess.check_output(args)\n" .
+                "        return subprocess.check_output(args).strip()\n" .
                 "    except subprocess.CalledProcessError as e:\n" .
-                "        return e.output\n";
+                "        return e.output.strip()\n";
             } elsif ($_ eq "captureStdout") {
                 $usedImports->{"fcntl"} = 1;
                 $usedImports->{"os"} = 1;
@@ -743,7 +743,7 @@ sub convert {
                 "            break\n" .
                 "\n" .
                 "    os.close(newStdoutR)\n" .
-                "    return result\n";
+                "    return result.strip()\n";
             } elsif ($_ eq "pipeline") {
                 $usedImports->{"fcntl"} = 1;
                 $usedImports->{"threading"} = 1;
