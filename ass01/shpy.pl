@@ -296,9 +296,9 @@ sub convert {
                     if ($exprParser->YYNberr() == 0) {
                         $result =~ /(?:[<=>]| and | or )/ and $result = "+($result)";
                         if ($isCapturingReturn) {
-                            return "__tmp = $result\nprint __tmp\nreturn __tmp; ";
+                            return "__tmp = str($result)\nprint __tmp\nreturn __tmp; ";
                         } else {
-                            return "print $result; ";
+                            return "print str($result); ";
                         }
                     }
                 } elsif ($args[0] eq "\"read\"") {
