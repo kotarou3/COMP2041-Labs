@@ -84,7 +84,7 @@
         if ($nextDelimIndex != 0) {
             # No special processing needed if in double quotes
             if ($ARG[0]->YYData->{"stateStack"}->[-1] eq "dquotes") {
-                return ("WORD", substr($ARG[0]->YYData->{"DATA"}, 0, $nextDelimIndex, ""));
+                return ("WORD_SQUOTED", substr($ARG[0]->YYData->{"DATA"}, 0, $nextDelimIndex, ""));
             }
 
             # Another special case for variable assignments, with same reason as above
