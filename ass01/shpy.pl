@@ -786,23 +786,23 @@ sub convert {
             } else {
                 die("Should never happen");
             }
-        } keys %$usedBuiltins);
+        } sort keys %$usedBuiltins);
     }
 
     # Generate subshell functions
-    push(@header, map {
+    push(@header, sort map {
         my $body = $_;
         $body =~ /^\n/ or $body = "\n$body";
         $body =~ /\n$/ or $body = "$body\n";
         $body =~ s/^/    /gm;
         "\ndef " . $subshells{$_} . "():$body";
-    } keys %subshells);
+    } sort keys %subshells);
 
     # Pull in unknown variables used from the environment
     if (scalar keys %unknownVars > 0) {
         if (!$parentShell || !$parentShell->{"unknownVars"}) {
             $usedImports->{"os"} = 1;
-            push(@header, map {"$_ = os.getenv(\"$_\", \"\")"} keys %unknownVars);
+            push(@header, map {"$_ = os.getenv(\"$_\", \"\")"} sort keys %unknownVars);
             push(@header, "\n");
         } else {
             foreach my $var (keys %unknownVars) {
@@ -818,7 +818,7 @@ sub convert {
 
     # Generate imports
     if (!$parentShell && scalar keys %$usedImports > 0) {
-        unshift(@header, "import " . join(", ", keys %$usedImports) . "\n");
+        unshift(@header, "import " . join(", ", sort keys %$usedImports) . "\n");
     }
 
     # Add builtins/imports to result
