@@ -570,6 +570,14 @@ word_or_reserved : word
                  ;
 word             : word_no_assign
                  | assignment_word
+                     {
+                         if ($ARG[1]->{"value"}) {
+                             unshift(@{$ARG[1]->{"value"}->{"children"}}, $ARG[1]->{"var"} . "=");
+                             $ARG[1]->{"value"};
+                         } else {
+                             createNode("word", $ARG[1]->{"var"} . "=");
+                         }
+                     }
                  ;
 word_no_assign   :                                  word_part
                      {createNode("word", $ARG[1]);}
