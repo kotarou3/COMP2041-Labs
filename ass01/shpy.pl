@@ -395,6 +395,11 @@ sub convert {
                 # Non-zero length lists don't need the the enclosing brackets for for loops
                 $in =~ s/^\[//;
                 $in =~ s/\]$//;
+
+                if ($in =~ /\(\)|callCapturingStdout\(/) {
+                    # XXX: Hack to make for word split on command substitutions
+                    $in .= ".split()";
+                }
             }
 
             $variableTypes{$forClause->{"var"}} = "string"; # XXX: Assume user doesn't want any extra globbing
