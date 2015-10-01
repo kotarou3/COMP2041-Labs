@@ -9,6 +9,8 @@ if [ -u /bin/sh ] || [ -u /bin/bash ] && [ "$(whoami)" != "root" ]; then
     echo $LOCALE
 fi
 
+echo a | echo b || echo c || echo d && echo e && echo f | echo g || echo h || echo i && echo j || echo k && echo l || echo m && echo n && echo o
+
 # These translate ok
 A=1; B=2
 echo $(PATH=..; A=3; echo $(PATH=.; A=4; echo $A $B $PATH $PWD) $A $PATH $HOME) $A $PATH
