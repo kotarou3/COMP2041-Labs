@@ -115,6 +115,10 @@ sub convert {
                 $andOr->{"children"}[$c]->{"captureReturn"} = 1;
             }
 
+            if (scalar @{$andOr->{"children"}} == 1) {
+                return &$doDefault($andOr->{"children"}[0]);
+            }
+
             # Hoist comments to the front, since python doesn't support multiline conditionals
             my @newlineList;
 
