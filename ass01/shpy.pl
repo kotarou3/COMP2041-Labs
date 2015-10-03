@@ -710,10 +710,8 @@ sub convert {
 
     # Generate builtins
     if (!$parentShell) {
-        foreach my $builtin (keys %$usedBuiltins) {
-            if ($builtin eq "pipeline") {
-                $usedBuiltins->{"captureStdout"} = 1;
-            }
+        if ($usedBuiltins->{"pipeline"}) {
+            $usedBuiltins->{"captureStdout"} = 1
         }
         push(@header, map {
             if ($_ eq "callCapturingStdout") {
