@@ -326,6 +326,28 @@ sub convert {
                     } else {
                         print(STDERR "Warning: `read` builtin used but could not be translated\n");
                     }
+                } elsif ($args[0] eq "\"rm\"" && $args[1] && ($args[1] eq "\"--\"" && $args[2] || !($args[1] =~ /^"-/))) {
+                    shift @args;
+                    shift @globbedArgs;
+                    if ($args[0] eq "\"--\"") {
+                        shift @args;
+                        shift @globbedArgs;
+                    }
+
+                    $usedImports->{"os"} = 1;
+                    my $result;
+                    if (scalar @args > 1 || $isCommandGlobbed) {
+                        $result = "[os.unlink(file) for file in " . &$globsToPythonList(\@args, \@globbedArgs) . "]; ";
+                        if ($isCapturingReturn) {
+                            $result = "return not not $result";
+                        }
+                    } else {
+                        $result = "os.unlink(" . $args[0] . "); ";
+                        if ($isCapturingReturn) {
+                            $result = "return not $result";
+                        }
+                    }
+                    return $result;
                 } elsif (($args[0] eq "\"test\"" || $args[0] eq "\"[\"" && $args[-1] eq "\"]\"") && !$isCommandGlobbed) {
                     my @argsCopy = @args; # Don't modify arguments if parser fails
                     shift @argsCopy;
