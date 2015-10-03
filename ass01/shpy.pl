@@ -305,6 +305,13 @@ sub convert {
                             return "print str($result); ";
                         }
                     }
+                } elsif ($args[0] eq "\"ls\"" && scalar @args <= 2  && !($args[1] && $args[1] =~ /^"-/) && !$isCommandGlobbed) {
+                    $usedImports->{"os"} = 1;
+                    my $result = "print \"\\n\".join(sorted(filter(lambda file: file[0] != \".\", os.listdir(" . ($args[1] || "\".\"") . ")))); ";
+                    if ($isCapturingReturn) {
+                        $result .= "\nreturn True; ";
+                    }
+                    return $result;
                 } elsif ($args[0] eq "\"read\"") {
                     if (scalar @args == 1 || scalar @args == 2 && $args[1] =~ /"([a-z_][a-z0-9_]*)"/i) {
                         my $var;
