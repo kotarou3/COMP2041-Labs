@@ -557,12 +557,15 @@ sub convert {
             my ($word, $ignoreGlobbing) = @ARG;
             $word = $word->{"children"};
 
-            # Check if the word has any globs first
+            # Check if the word has any globs or variables first
             # If globbing is ignored, check if the resulting word contains any globs
             $isGlobbed = 0;
+            my $hasVariables = 0;
             foreach my $part (@$word) {
                 if (ref($part) eq "HASH") {
                     if ($part->{"type"} eq "variable") {
+                        $hasVariables = 1;
+
                         # Check for command arguments ($0..$9, $@, $*, $#)
                         if ($part->{"value"} =~ /^([0-9])$/) {
                             $usedImports->{"sys"} = 1;
@@ -614,6 +617,12 @@ sub convert {
                             $_->{"value"} =~ s/([]*?[])/[$1]/g;
                         }
 
+                        # Escape braces if necessary
+                        if ($hasVariables) {
+                            $_->{"value"} =~ s/{/{{/g;
+                            $_->{"value"} =~ s/}/}}/g;
+                        }
+
                         $_->{"value"};
                     } elsif ($_->{"type"} eq "list") {
                         # Command substitution executes in a subshell, so we use a function for that
@@ -648,6 +657,12 @@ sub convert {
                         "{" . (scalar @variables - 1) . "}";
                     }
                 } else {
+                    # Escape braces if necessary
+                    if ($hasVariables) {
+                        $_ =~ s/{/{{/g;
+                        $_ =~ s/}/}}/g;
+                    }
+
                     $_;
                 }
             } @$word);
