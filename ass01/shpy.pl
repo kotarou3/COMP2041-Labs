@@ -312,6 +312,12 @@ sub convert {
                         $result .= "\nreturn True; ";
                     }
                     return $result;
+                }  elsif ($args[0] eq "\"mv\"" && !($args[1] && $args[1] =~ /^"-/)) {
+                    shift @args;
+                    shift @globbedArgs;
+
+                    $usedBuiltins->{"mv"} = 1;
+                    return ($isCapturingReturn ? "return not " : "") . "mv(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
                 } elsif ($args[0] eq "\"read\"") {
                     if (scalar @args == 1 || scalar @args == 2 && $args[1] =~ /"([a-z_][a-z0-9_]*)"/i) {
                         my $var;
@@ -775,6 +781,15 @@ sub convert {
                 "\n" .
                 "    os.close(newStdoutR)\n" .
                 "    return result.strip()\n";
+            } elsif ($_ eq "mv") {
+                $usedImports->{"os"} = 1;
+                $usedImports->{"errno"} = 1;
+                "def mv(args):\n" .
+                "    if len(args) > 2 or os.path.isdir(args[-1]):\n" .
+                "        for src in args[0:-1]:\n" .
+                "            os.rename(src, os.path.join(args[-1], src))\n" .
+                "    else:\n" .
+                "        os.rename(args[0], args[1])\n";
             } elsif ($_ eq "pipeline") {
                 $usedImports->{"fcntl"} = 1;
                 $usedImports->{"threading"} = 1;
