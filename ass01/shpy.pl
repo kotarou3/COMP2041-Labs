@@ -268,6 +268,9 @@ sub convert {
                     } else {
                         print(STDERR "Warning: `cd` builtin used but could not be translated\n");
                     }
+                } elsif ($args[0] eq "\"chmod\"" && scalar @args == 3 && $args[1] =~ /^\"([0-7]+)\"$/ && !$isCommandGlobbed) {
+                    $usedImports->{"os"} = 1;
+                    return ($isCapturingReturn ? "return not " : "") . "os.chmod(" . $args[2] . ", 0$1); ";
                 } elsif ($args[0] eq "\"echo\"") {
                     shift @args;
                     shift @globbedArgs;
