@@ -39,8 +39,11 @@
             "\$(" => "COMMAND_SUB_START"
         });
 
+        my $stateStack = $ARG[0]->YYData->{"stateStack"};
+        my $currentStateIgnoringWord = $stateStack->[-1] eq "word" ? $stateStack->[-2] : $stateStack->[-1];
+
         # When in double quotes, it has delimiters of its own
-        if ($ARG[0]->YYData->{"stateStack"}->[-1] eq "dquotes") {
+        if ($currentStateIgnoringWord eq "dquotes") {
             @delimiters = ({
                 # Single character delimiters
                 "\\" => "ESCAPE",
@@ -83,7 +86,7 @@
 
         if ($nextDelimIndex != 0) {
             # No special processing needed if in double quotes
-            if ($ARG[0]->YYData->{"stateStack"}->[-1] eq "dquotes") {
+            if ($currentStateIgnoringWord eq "dquotes") {
                 return ("WORD_SQUOTED", substr($ARG[0]->YYData->{"DATA"}, 0, $nextDelimIndex, ""));
             }
 
@@ -133,14 +136,12 @@
             $ARG[0]->YYData->{"DATA"} =~ s/^'([^']*)'// and return ("WORD_SQUOTED", $1);
             error($ARG[0], "unexpected EOF while looking for matching `''");
             return ("", undef);
-        } elsif ($nextDelimType eq ")" && $ARG[0]->YYData->{"stateStack"}->[-1] eq "dquotes") {
+        } elsif ($nextDelimType eq ")" && $currentStateIgnoringWord eq "dquotes") {
             # ")" only has special meaning in double quotes when it is used to end a command substitution
             $nextDelimType = "WORD_SQUOTED";
         } elsif ($nextDelimType eq "`") {
             # XXX: Hack to make grammar unambiguous
-            my $state = $ARG[0]->YYData->{"stateStack"};
-            if ($state->[-1] eq "cmd_sub_`" ||
-                scalar @$state >= 2 && $state->[-2] eq "cmd_sub_`" && $state->[-1] eq "word") {
+            if ($currentStateIgnoringWord eq "cmd_sub_`") {
                 $nextDelimType = "BACKTICK_END";
             } else {
                 $nextDelimType = "BACKTICK_START";
@@ -185,6 +186,7 @@
             $ARG[0]->YYData->{"stateStack"} = ["top"];
         }
         my $stateStack = $ARG[0]->YYData->{"stateStack"};
+        my $currentStateIgnoringWord = $stateStack->[-1] eq "word" ? $stateStack->[-2] : $stateStack->[-1];
 
         if (!$ARG[0]->YYData->{"queuedTokens"}) {
             $ARG[0]->YYData->{"queuedTokens"} = [];
@@ -195,10 +197,11 @@
             ($tokenType, $tokenValue) = @{shift(@{$ARG[0]->YYData->{"queuedTokens"}})};
         } else {
             # Whitespace is ignored (outside of quotes)
-            if ($stateStack->[-1] ne "dquotes") {
+            if ($currentStateIgnoringWord ne "dquotes") {
                 if ($ARG[0]->YYData->{"DATA"} =~ s/^((?:[ \t]|\\\n)+)//) {
                     if ($1 =~ /[ \t]/ && $stateStack->[-1] eq "word") {
                         pop(@$stateStack);
+                        $currentStateIgnoringWord = $stateStack->[-1] eq "word" ? $stateStack->[-2] : $stateStack->[-1];
                     }
                 }
             }
@@ -211,7 +214,7 @@
         }
 
         # Double quotes are never sent to the parser - they're implemented as a delimiter change in the lexer
-        if ($tokenType eq "DQUOTE" && ($stateStack->[-1] eq "dquotes" || $stateStack->[-1] eq "word" && $stateStack->[-2] eq "dquotes")) {
+        if ($tokenType eq "DQUOTE" && $currentStateIgnoringWord eq "dquotes") {
             if ($stateStack->[-1] eq "word") {
                 pop(@$stateStack);
             }
