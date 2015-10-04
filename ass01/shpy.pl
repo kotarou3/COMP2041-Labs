@@ -466,8 +466,59 @@ sub convert {
         },
 
         "case_clause" => sub {
-            print(STDERR "Warning: The case clause is currently unsupported\n");
-            return "# case_clause";
+            my ($caseClause) = @ARG;
+            $caseClause = $caseClause->{"value"};
+
+            my $result = &$doDefault($caseClause->{"comments"});
+            $result =~ s/^\s+//;
+            if (length $result > 0 && !($result =~ /\n$/)) {
+                $result .= "\n";
+            }
+
+            my $word = &$doDefault($caseClause->{"word"});
+
+            if (!$caseClause->{"cases"}) {
+                return "${result}if $word:\n    pass # Empty case clause\n";
+            }
+
+            for (my $c = 0; $c < scalar @{$caseClause->{"cases"}}; ++$c) {
+                my $case = $caseClause->{"cases"}[$c];
+
+                my @conditions;
+                my $isDefaultMatch = 0;
+                foreach my $pattern (@{$case->{"case"}}) {
+                    my $match = &$doDefault($pattern);
+                    if ($match eq "\"*\"") {
+                        $isDefaultMatch = $c == scalar @{$caseClause->{"cases"}} - 1;
+                        push(@conditions, "True");
+                    } elsif ($match =~ /[]?*[]/) {
+                        $usedImports->{"fnmatch"} = 1;
+                        push(@conditions, "fnmatch.fnmatchcase($word, $match)");
+                    } else {
+                        push(@conditions, "$word == $match");
+                    }
+                }
+                my $condition = join(" or ", @conditions);
+                if ($c == 0) {
+                    $condition = "if $condition:";
+                } elsif ($isDefaultMatch) {
+                    $condition = "else:";
+                } else {
+                    $condition = "elif $condition:";
+                }
+
+                my $action = $case->{"action"} ? &$doDefault($case->{"action"}) : "pass; ";
+                $action =~ s/^/    /mg;
+
+                my $comments = &$doDefault($case->{"comments"});
+                if (!($comments =~ /\n$/)) {
+                    $comments .= "\n";
+                }
+
+                $result .= "$condition\n$action$comments";
+            }
+
+            return $result;
         },
 
         "if_clause" => sub {

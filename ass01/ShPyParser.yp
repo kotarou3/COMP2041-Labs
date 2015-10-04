@@ -478,7 +478,7 @@ case_item        :     pattern ')' linebreak    DSEMI linebreak
 pattern          :             word
                      {[$ARG[1]];}
                  | pattern '|' word
-                     {push @{$ARG[1]}, $ARG[2]; $ARG[1];}
+                     {push @{$ARG[1]}, $ARG[3]; $ARG[1];}
                  ;
 if_clause        : If list Then list else_part Fi
                      {{"condition" => $ARG[2], "then" => $ARG[4], "else" => $ARG[5]};}
