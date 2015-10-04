@@ -276,13 +276,28 @@ sub convert {
                     shift @globbedArgs;
 
                     my $result;
-                    if (!$isCommandGlobbed) {
-                        $result = scalar @args > 0 ? "print " . join(", ", @args) . "; " : "print; ";
+                    if ($args[0] && $args[0] eq "\"-n\"") {
+                        shift @args;
+                        shift @globbedArgs;
+
+                        $usedImports->{"sys"} = 1;
+                        if (!$isCommandGlobbed && scalar @args <= 1) {
+                            $result = "sys.stdout.write(" . ($args[0] || "\"\"") . "); ";
+                        } else {
+                            $result = "sys.stdout.write(\" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . ")); ";
+                        }
+                        if ($isCapturingReturn) {
+                            $result = "return not $result";
+                        }
                     } else {
-                        $result = "print \" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
-                    }
-                    if ($isCapturingReturn) {
-                        $result .= "\nreturn True; ";
+                        if (!$isCommandGlobbed) {
+                            $result = scalar @args > 0 ? "print " . join(", ", @args) . "; " : "print; ";
+                        } else {
+                            $result = "print \" \".join(" . &$globsToPythonList(\@args, \@globbedArgs) . "); ";
+                        }
+                        if ($isCapturingReturn) {
+                            $result .= "\nreturn True; ";
+                        }
                     }
                     return $result;
                 } elsif ($args[0] eq "\"exit\"") {
