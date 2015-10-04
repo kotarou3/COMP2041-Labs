@@ -133,6 +133,9 @@
             $ARG[0]->YYData->{"DATA"} =~ s/^'([^']*)'// and return ("WORD_SQUOTED", $1);
             error($ARG[0], "unexpected EOF while looking for matching `''");
             return ("", undef);
+        } elsif ($nextDelimType eq ")" && $ARG[0]->YYData->{"stateStack"}->[-1] eq "dquotes") {
+            # ")" only has special meaning in double quotes when it is used to end a command substitution
+            $nextDelimType = "WORD_SQUOTED";
         } elsif ($nextDelimType eq "`") {
             # XXX: Hack to make grammar unambiguous
             my $state = $ARG[0]->YYData->{"stateStack"};
