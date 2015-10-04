@@ -127,6 +127,13 @@
             $nextDelim =~ s/\\\n//g;
             return ("VARIABLE", substr($nextDelim, 1)); # Don't include the $
         } elsif ($nextDelimType eq "ESCAPE") {
+            # If we're in double quotes, only "escape" if [$`"\] follows
+            if ($currentStateIgnoringWord eq "dquotes") {
+                $ARG[0]->YYData->{"DATA"} =~ s/^\\([\$`"\\])// and return ("ESCAPED", $1);
+                $ARG[0]->YYData->{"DATA"} =~ s/^\\// or die("Should never happen");
+                return ("ESCAPED", "\\");
+            }
+
             # If the stream ends before the escaped character, return nothing (not specified by POSIX, but is bash's behaviour)
             $ARG[0]->YYData->{"DATA"} =~ s/^\\(.)// and return ("ESCAPED", $1);
             $ARG[0]->YYData->{"DATA"} =~ /^\\\n/ and die("Should never happen");
