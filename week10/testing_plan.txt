@@ -1,0 +1,42 @@
+"0000-0000-0000-0000" -> "0000000000000000 is valid" & empty textbox
+"0000-0000-0000-0001" -> "0000000000000001 is invalid" & "0000000000000001" in textbox
+"" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~ " -> "0123456789 is invalid - does not contain exactly 16 digits" & "0123456789" in textbox
+"𝟢" ->
+    Expected: "120802 is invalid - does not contain exactly 16 digits" & "120802" in textbox
+    Actual: "is invalid - does not contain exactly 16 digits" & empty textbox
+
+GET "creditcard.cgi?credit_card=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=a" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?submit=" -> Default page
+GET "creditcard.cgi?submit=a" -> Default page
+GET "creditcard.cgi?close=" -> Default page
+GET "creditcard.cgi?close=a" -> Close page
+GET "creditcard.cgi?close=0" -> Default page
+
+GET "creditcard.cgi?credit_card=&submit=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=a&submit=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=&submit=a" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=a&submit=a" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+
+GET "creditcard.cgi?credit_card=&close=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=a&close=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=&close=a" -> Close page
+GET "creditcard.cgi?credit_card=a&close=a" -> Close page
+
+GET "creditcard.cgi?submit=&close=" -> Default page
+GET "creditcard.cgi?submit=a&close=" -> Default page
+GET "creditcard.cgi?submit=&close=a" -> Close page
+GET "creditcard.cgi?submit=a&close=a" -> Close page
+
+GET "creditcard.cgi?credit_card=&submit=&close=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=a&submit=&close=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=&submit=a&close=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=&submit=&close=a" -> Close page
+GET "creditcard.cgi?credit_card=a&submit=a&close=" -> "is invalid - does not contain exactly 16 digits" & empty textbox
+GET "creditcard.cgi?credit_card=a&submit=&close=a" -> Close page
+GET "creditcard.cgi?credit_card=&submit=a&close=a" -> Close page
+GET "creditcard.cgi?credit_card=a&submit=a&close=a" -> Close page
+
+Reset button resets to value on page load (as opposed to empty)
+Close button returns "Thank you for using the Credit Card Validator."
