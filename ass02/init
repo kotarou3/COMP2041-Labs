@@ -1,0 +1,4 @@
+#!/bin/sh -e
+
+python -m bitter.db_create
+python -m bitter.db_import dataset-huge
