@@ -31,17 +31,82 @@ def render(req, res, view, model = None):
         elif 200 <= res.status <= 299:
             res.status = 204
     else:
-        try:
-            viewHandle = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "views", view), "r")
-        except IOError:
-            viewHandle = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), view), "r")
-
         res.headers["Content-Type"] = "application/xhtml+xml"
-        with viewHandle:
-            if view.rsplit(".", 1)[-1] == "bepy":
-                res.body = runBepy(viewHandle.read())
-            else:
-                res.body = viewHandle.read()
+        res.body = renderView(view, {
+            "req": req,
+            "res": res,
+            "model": model
+        })
 
-def runBepy(bepy):
-    res.body = bepy # TODO
+def renderView(view, params = {}):
+    try:
+        viewHandle = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "views", view), "r")
+    except IOError:
+        viewHandle = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), view), "r")
+
+    with viewHandle:
+        if view.rsplit(".", 1)[-1] == "bepy":
+            return runBepy(viewHandle.read(), params)
+        else:
+            return viewHandle.read()
+
+def escape(s):
+    from xml.sax.saxutils import escape
+    return escape(s, {"'": "&apos;", '"': "&quot;"})
+
+def runBepy(bepy, params):
+    # bepy = Bitter-flavoured Embedded Python = poor man's embedded python because not allowed to use libraries
+
+    translatedBepy = []
+    indentLevel = 0
+    for part in re.split("(<%.*?%>)", bepy):
+        if len(part) >= 4 and part.startswith("<%") and part.endswith("%>"):
+            part = part[2:-2].strip()
+
+            if part.startswith("#"):
+                # Comment
+                pass
+            elif part.startswith("="):
+                # Output shorthand
+                translatedBepy.append("    " * indentLevel + "output(eval(" + repr(part[1:]) + "))")
+            elif part.startswith("for "):
+                # Loop start
+                translatedBepy.append("    " * indentLevel + part)
+                indentLevel += 1
+            elif not part:
+                # Loop end
+                indentLevel -= 1
+            else:
+                translatedBepy.append("    " * indentLevel + part)
+        elif part.find("<%") >= 0 or part.find("%>") >= 0:
+            raise SyntaxError("Mismatched <% or %> in bepy")
+        else:
+            translatedBepy.append("    " * indentLevel + "outputRaw(" + repr(part) + ")")
+
+    import sys
+    sys.stderr.write("\n".join(translatedBepy) + "\n")
+
+    result = {"s": ""} # Hack to allow output functions to modify it
+    def outputRaw(s):
+        result["s"] += str(s)
+    def output(s):
+        outputRaw(escape(str(s)))
+
+    def include(view, params2 = {}):
+        if "req" in params:
+            params2["req"] = params["req"]
+        if "res" in params:
+            params2["res"] = params["res"]
+
+        outputRaw(renderView(view, params2))
+
+    functions = {
+        "include": include,
+        "escape": escape,
+        "outputRaw": outputRaw,
+        "output": output
+    }
+
+    exec "\n".join(translatedBepy) in functions, params
+
+    return result["s"]
