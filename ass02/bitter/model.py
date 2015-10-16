@@ -4,6 +4,8 @@ import re
 from bitter.db import db
 
 class Model(object):
+    publicProperties = set(("id",))
+
     def __init__(self, row):
         for key in row.keys():
             setattr(self, self._fromTableName(key), row[key])

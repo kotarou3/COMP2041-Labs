@@ -4,16 +4,6 @@ from bitter.renderer import render
 
 class UserController(Controller):
     @classmethod
-    def find(cls, req, res):
-        users = super(UserController, cls).find(req, res)
-
-        for user in users:
-            del user.email
-            del user.password
-
-        return users
-
-    @classmethod
     def findOne(cls, req, res):
         user = super(UserController, cls).findOne(req, res)
 
@@ -21,8 +11,6 @@ class UserController(Controller):
             user.populate("bleats")
             user.populate("listeningTo")
             user.populate("listenedBy")
-            del user.email
-            del user.password
 
         return user
 
@@ -34,8 +22,6 @@ class UserController(Controller):
             user.populate("bleats")
             user.populate("listeningTo")
             user.populate("listenedBy")
-            del user.email
-            del user.password
 
         return user
 

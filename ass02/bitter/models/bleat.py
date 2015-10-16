@@ -17,7 +17,14 @@ schema = """
 """
 
 class Bleat(Model):
-    pass
+    publicProperties = set((
+        "id",
+        "user",
+        "inReplyTo",
+        "content",
+        "timestamp",
+        "locationCoords"
+    ))
 
 """
 WITH RECURSIVE is_in_reply_to(id,in_reply_to,timestamp) AS (

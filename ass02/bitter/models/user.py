@@ -26,6 +26,18 @@ schema = """
 """
 
 class User(Model):
+    publicProperties = set((
+        "id",
+        "username",
+        "name",
+        "profileImage",
+        "homeCoords",
+        "homeSuburb",
+        "bleats",
+        "listeningTo",
+        "listenedBy"
+    ))
+
     def populate(self, attribute):
         cur = db.cursor()
         if attribute == "bleats":

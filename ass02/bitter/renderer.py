@@ -1,7 +1,10 @@
 from datetime import datetime
 import json
 import os
-import sys
+import re
+
+from bitter.db import Coordinates
+from bitter.model import Model
 
 # Make datetime and normal classes JSON serialisable
 def _jsonEncoderDefault(self, obj):
@@ -10,7 +13,10 @@ def _jsonEncoderDefault(self, obj):
     except TypeError as e:
         if isinstance(obj, datetime):
             return (obj - datetime.utcfromtimestamp(0)).total_seconds()
-        elif hasattr(obj, "__dict__"):
+        elif isinstance(obj, Model):
+            properties = vars(obj)
+            return {key:properties[key] for key in obj.publicProperties.intersection(properties)}
+        elif isinstance(obj, Coordinates):
             return vars(obj)
         else:
             raise e
