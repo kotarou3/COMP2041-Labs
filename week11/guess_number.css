@@ -1,0 +1,48 @@
+@keyframes cancer {
+    from {
+        margin-left: 100vw;
+        margin-top: 100vh;
+        transform: rotate(0deg);
+    }
+    to {
+        margin-left: -150vw;
+        margin-top: -150vh;
+        transform: rotate(720deg);
+    }
+}
+
+@keyframes blink {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+* {
+    color: red;
+    font-size: 20vh;
+}
+
+html {
+    animation-name: blink;
+    animation-duration: 0.25s;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+body {
+    animation-name: cancer;
+    animation-duration: 5s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+input {
+    color: blue;
+    height: 20vh;
+    width: 11em;
+}

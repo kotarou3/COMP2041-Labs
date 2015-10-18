@@ -17,6 +17,7 @@ Content-Type: text/html
 <html lang="en">
 <head>
     <title>Guess A Number</title>
+    <link href="../guess_number.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
 eof
