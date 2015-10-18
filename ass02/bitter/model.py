@@ -5,6 +5,9 @@ from bitter.db import db
 
 class Model(object):
     publicProperties = set(("id",))
+    defaultOrderBy = "id asc"
+
+    _sentinel = object()
 
     def __init__(self, row):
         for key in row.keys():
@@ -36,25 +39,61 @@ class Model(object):
         return result
 
     @classmethod
-    def find(cls, where = {}, limit = 0):
+    def paginate(cls, where = {}, orderBy = _sentinel, page = 1, perPage = 20):
+        if orderBy is cls._sentinel:
+            orderBy = cls.defaultOrderBy
+
+        cur = db.cursor()
+
         query = "select * from {0}".format(cls._toTableName(cls.__name__))
 
         if where:
             where = cls._buildWhereClause(where)
             query += " where {0}".format(" and ".join(where.keys()))
 
-        if limit:
-            query += " limit {0:d}".format(limit)
+        if orderBy:
+            query += " order by {0}".format(orderBy)
 
-        cur = db.cursor()
+        if perPage:
+            # Get total number of records so we can work out pages
+            cur.execute(query.replace("select * from", "select count(*) from"), where.values())
+            totalRecords = cur.fetchone()[0]
+
+            query += " limit {0:d}".format(perPage)
+            if page > 1:
+                query += " offset {0:d}".format(perPage * (page - 1))
+
         cur.execute(query, where.values())
+        records = map(cls, cur.fetchall())
 
-        return map(cls, cur.fetchall())
+        if not perPage:
+            totalRecords = len(records)
+        totalPages = (totalRecords + (perPage - 1)) / perPage if perPage else 1 # Ceiling division
+
+        return {
+            "records": records,
+            "page": page,
+            "totalRecords": totalRecords,
+            "totalPages": totalPages
+        }
+
+    @classmethod
+    def find(cls, where = {}, orderBy = _sentinel, limit = 0):
+        return cls.paginate(where, orderBy = orderBy, perPage = limit)["records"]
 
     @classmethod
     def findOne(cls, where = {}):
-        result = cls.find(where, 1)
-        return result[0] if result else None
+        query = "select * from {0}".format(cls._toTableName(cls.__name__))
+
+        if where:
+            where = cls._buildWhereClause(where)
+            query += " where {0}".format(" and ".join(where.keys()))
+
+        cur = db.cursor()
+        cur.execute(query + " limit 1", where.values())
+
+        result = cur.fetchone()
+        return cls(result) if result else None
 
     @classmethod
     def create(cls, properties):

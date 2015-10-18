@@ -25,6 +25,7 @@ class Bleat(Model):
         "timestamp",
         "locationCoords"
     ))
+    defaultOrderBy = "timestamp desc, id desc"
 
 """
 WITH RECURSIVE is_in_reply_to(id,in_reply_to,timestamp) AS (
