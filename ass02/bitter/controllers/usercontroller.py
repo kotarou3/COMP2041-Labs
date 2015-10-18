@@ -1,6 +1,5 @@
 from bitter.controller import Controller
 from bitter.models.user import User
-from bitter.renderer import render
 
 class UserController(Controller):
     @classmethod
