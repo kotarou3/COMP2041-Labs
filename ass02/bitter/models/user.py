@@ -53,6 +53,19 @@ class User(Model):
             raise LookupError("User models do not contain {0} relations".format(attribute))
 
     @classmethod
+    def _buildWhereClause(cls, where):
+        search = where.pop("search", None)
+
+        result = super(User, cls)._buildWhereClause(where)
+
+        if search:
+            search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            search = "%" + search.replace(" ", "%") + "%"
+            result["(username || \" \" || name) like ? escape \"\\\""] = search
+
+        return result
+
+    @classmethod
     def update(cls, where, update):
         where = cls._buildWhereClause(where)
 

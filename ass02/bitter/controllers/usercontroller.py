@@ -3,6 +3,16 @@ from bitter.models.user import User
 
 class UserController(Controller):
     @classmethod
+    def find(cls, req, res):
+        try:
+            page = int(req.params.pop("page", 1))
+        except ValueError:
+            res.status = 400
+            return
+
+        return cls._Model.paginate(cls._whitelistParams(req.params, set(("search",))), page = page)
+
+    @classmethod
     def findOne(cls, req, res):
         user = super(UserController, cls).findOne(req, res)
 

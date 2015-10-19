@@ -2,10 +2,12 @@ from bitter.renderer import render
 
 class Controller(object):
     @classmethod
-    def _whitelistParams(cls, params):
+    def _whitelistParams(cls, params, extraWhitelist = set()):
         result = {}
         for key, value in params.iteritems():
             if key in cls._whitelistedProperties:
+                result[key] = value
+            elif key in extraWhitelist:
                 result[key] = value
         return result
 
