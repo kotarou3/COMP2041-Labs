@@ -142,3 +142,6 @@ class Model(object):
 
     def save(self):
         self.update({"id": self.id}, vars(self))
+
+    def erase(self):
+        self.delete({"id": self.id})

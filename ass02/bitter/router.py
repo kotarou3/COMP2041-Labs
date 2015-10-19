@@ -3,9 +3,19 @@ import re
 
 from bitter.renderer import render
 
-defaultControllers = {}
-for name in "user", "bleat":
-    defaultControllers[name] = getattr(importlib.import_module("bitter.controllers.{0}controller".format(name)), name.capitalize() + "Controller")()
+defaultRoutes = {}
+for name in "user", "bleat", "session":
+    controller = getattr(importlib.import_module("bitter.controllers.{0}controller".format(name)), name.capitalize() + "Controller")()
+    if (hasattr(controller, "findAndRender")):
+        defaultRoutes[("GET", "^/{0}/?$".format(name))] = controller.findAndRender
+    if (hasattr(controller, "findOneAndRender")):
+        defaultRoutes[("GET", "^/{0}/:id$".format(name))] = controller.findOneAndRender
+    if (hasattr(controller, "createOneAndRender")):
+        defaultRoutes[("POST", "^/{0}/?$".format(name))] = controller.createOneAndRender
+    if (hasattr(controller, "updateOneAndRender")):
+        defaultRoutes[("PATCH", "^/{0}/:id$".format(name))] = controller.updateOneAndRender
+    if (hasattr(controller, "deleteOneAndRender")):
+        defaultRoutes[("DELETE", "^/{0}/:id$".format(name))] = controller.deleteOneAndRender
 
 idRegex = "(?P<id>[0-9]+)"
 
@@ -15,17 +25,8 @@ class Router(object):
         self.routes = {}
 
         # Add default routes
-        for name, controller in defaultControllers.iteritems():
-            if (hasattr(controller, "findAndRender")):
-                self.addRoute("GET", "^/{0}/?$".format(name), controller.findAndRender)
-            if (hasattr(controller, "findOneAndRender")):
-                self.addRoute("GET", "^/{0}/:id$".format(name), controller.findOneAndRender)
-            if (hasattr(controller, "createOneAndRender")):
-                self.addRoute("POST", "^/{0}/?$".format(name), controller.createOneAndRender)
-            if (hasattr(controller, "updateOneAndRender")):
-                self.addRoute("PATCH", "^/{0}/:id$".format(name), controller.updateOneAndRender)
-            if (hasattr(controller, "deleteOneAndRender")):
-                self.addRoute("DELETE", "^/{0}/:id$".format(name), controller.deleteOneAndRender)
+        for route, handler in defaultRoutes.iteritems():
+            self.addRoute(route[0], route[1], handler)
 
         # Add custom routes
         for route, handler in routes.iteritems():

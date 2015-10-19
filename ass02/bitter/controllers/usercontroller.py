@@ -15,6 +15,10 @@ class UserController(Controller):
 
     @classmethod
     def updateOne(cls, req, res):
+        if not req.user or str(req.user.id) != req.params["id"]:
+            res.status = 403
+            return
+
         user = super(UserController, cls).updateOne(req, res)
 
         if user:
@@ -23,6 +27,14 @@ class UserController(Controller):
             user.populate("listenedBy")
 
         return user
+
+    @classmethod
+    def deleteOne(cls, req, res):
+        if not req.user or str(req.user.id) != req.params["id"]:
+            res.status = 403
+            return
+
+        return super(UserController, cls).deleteOne(req, res)
 
     _Model = User
     _whitelistedProperties = set((

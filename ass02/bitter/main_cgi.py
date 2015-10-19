@@ -41,6 +41,7 @@ try:
                 body[key] = fieldStorage[key].value
 
     req = Request(
+        remoteAddress = os.environ["REMOTE_ADDR"],
         method = os.environ["REQUEST_METHOD"],
         path = path,
         fileext = fileext,
@@ -65,6 +66,8 @@ finally:
     print "Status: {0}\r".format(res.status)
     for key, value in res.headers.iteritems():
         print "{0}: {1}\r".format(key, value)
+    if res.cookies:
+        print res.cookies.output() + "\r"
     print "\r"
 
     sys.stdout.write(res.body)
