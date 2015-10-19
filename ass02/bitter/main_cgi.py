@@ -1,11 +1,15 @@
 import cgi
 import os
 import sys
+import unicodedata
 import urlparse
 
 from bitter.db import db
 from bitter.reqres import Request, Response
 from bitter.router import Router
+
+def utf8Decode(str):
+    return unicodedata.normalize("NFC", str.decode("utf8"))
 
 res = Response(headers = {"Content-Type": "text/plain"})
 try:
@@ -27,7 +31,7 @@ try:
     params = urlparse.parse_qs(os.environ["QUERY_STRING"], keep_blank_values = True)
     for key, value in params.iteritems():
         if len(value) == 1:
-            params[key] = value[0]
+            params[key] = utf8Decode(value[0])
     del os.environ["QUERY_STRING"]
 
     # Parse the body and converting it to a dict
@@ -36,9 +40,9 @@ try:
         fieldStorage = cgi.FieldStorage(keep_blank_values = True)
         for key in fieldStorage.keys():
             if isinstance(fieldStorage[key], list):
-                body[key] = map(lambda value: value.value, fieldStorage[key])
+                body[key] = map(lambda value: utf8Decode(value.value), fieldStorage[key])
             else:
-                body[key] = fieldStorage[key].value
+                body[key] = utf8Decode(fieldStorage[key].value)
 
     req = Request(
         remoteAddress = os.environ["REMOTE_ADDR"],
