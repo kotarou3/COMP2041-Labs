@@ -10,6 +10,10 @@ class BleatController(Controller):
             res.status = 403
             return
 
+        if not "content" in req.body or not 1 <= len(req.body["content"]) <= 142:
+            res.status = 400
+            return
+
         req.body["user"] = req.user.id
         req.body["timestamp"] = datetime.utcnow()
 
