@@ -5,9 +5,9 @@ from bitter.models.bleat import Bleat
 
 class BleatController(Controller):
     @classmethod
-    def create(cls, req, res):
+    def createOne(cls, req, res):
         req.body["timestamp"] = datetime.utcnow()
-        return super(BleatController, cls).create(req, res)
+        return super(BleatController, cls).createOne(req, res)
 
     _Model = Bleat
     _whitelistedProperties = set((
