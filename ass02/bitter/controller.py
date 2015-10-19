@@ -35,10 +35,11 @@ class Controller(object):
     @classmethod
     def findOneAndRender(cls, req, res):
         model = cls.findOne(req, res)
-        if not model:
-            res.status = 404
-        if 200 <= res.status <= 299 and res.status != 204 and not res.body:
-            render(req, res, "{0}/findOne.html.bepy".format(cls._Model.__name__.lower()), model)
+        if 200 <= res.status <= 299 and res.status != 204:
+            if not model:
+                res.status = 404
+            elif not res.body:
+                render(req, res, "{0}/findOne.html.bepy".format(cls._Model.__name__.lower()), model)
 
     @classmethod
     def createOne(cls, req, res):
@@ -76,10 +77,11 @@ class Controller(object):
     @classmethod
     def updateOneAndRender(cls, req, res):
         model = cls.updateOne(req, res)
-        if not model:
-            res.status = 404
-        if 200 <= res.status <= 299 and res.status != 204 and not res.body:
-            render(req, res, "{0}/findOne.html.bepy".format(cls._Model.__name__.lower()), model)
+        if 200 <= res.status <= 299 and res.status != 204:
+            if not model:
+                res.status = 404
+            elif not res.body:
+                render(req, res, "{0}/findOne.html.bepy".format(cls._Model.__name__.lower()), model)
 
     @classmethod
     def deleteOne(cls, req, res):
@@ -87,11 +89,12 @@ class Controller(object):
 
     @classmethod
     def deleteOneAndRender(cls, req, res):
-        model = cls.deleteOne(req, res)
-        if not model:
-            res.status = 404
-        if 200 <= res.status <= 299 and res.status != 204 and not res.body:
-            render(req, res, "{0}/deleteOne.html.bepy".format(cls._Model.__name__.lower()))
+        isDeleted = cls.deleteOne(req, res)
+        if 200 <= res.status <= 299 and res.status != 204:
+            if not isDeleted:
+                res.status = 404
+            elif not res.body:
+                render(req, res, "{0}/deleteOne.html.bepy".format(cls._Model.__name__.lower()))
 
     _Model = None
     _whitelistedProperties = set(("id",))
