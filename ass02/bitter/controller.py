@@ -11,14 +11,11 @@ class Controller(object):
 
     @classmethod
     def find(cls, req, res):
-        page = 1
-        if "page" in req.params:
-            try:
-                page = int(req.params["page"])
-                del req.params["page"]
-            except ValueError:
-                res.status = 400
-                return
+        try:
+            page = int(req.params.pop("page", 1))
+        except ValueError:
+            res.status = 400
+            return
 
         return cls._Model.paginate(cls._whitelistParams(req.params), page = page)
 

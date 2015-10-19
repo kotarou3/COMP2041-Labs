@@ -13,14 +13,11 @@ class SessionController(Controller):
             res.status = 403
             return
 
-        page = 1
-        if "page" in req.params:
-            try:
-                page = int(req.params["page"])
-                del req.params["page"]
-            except ValueError:
-                res.status = 400
-                return
+        try:
+            page = int(req.params.pop("page", 1))
+        except ValueError:
+            res.status = 400
+            return
 
         return Session.paginate({"user": req.user.id}, page = page)
 

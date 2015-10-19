@@ -67,9 +67,7 @@ with db:
             if "locationLon" in bleat:
                 del bleat["locationLon"]
         if "locationLat" in bleat:
-            bleat["locationCoords"] = Coordinates(float(bleat["locationLat"]), float(bleat["locationLon"]))
-            del bleat["locationLat"]
-            del bleat["locationLon"]
+            bleat["locationCoords"] = Coordinates(float(bleat.pop("locationLat")), float(bleat.pop("locationLon")))
 
         bleats[bleatId] = bleat
 
@@ -106,15 +104,10 @@ with db:
             if "homeLon" in user:
                 del user["homeLon"]
         if "homeLat" in user:
-            user["homeCoords"] = Coordinates(float(user["homeLat"]), float(user["homeLon"]))
-            del user["homeLat"]
-            del user["homeLon"]
+            user["homeCoords"] = Coordinates(float(user.pop("homeLat")), float(user.pop("homeLon")))
 
         # Don't add listens just yet, since not all users have been created yet
-        listeningTo = []
-        if "listeningTo" in user:
-            listeningTo = user["listeningTo"]
-            del user["listeningTo"]
+        listeningTo = user.pop("listeningTo", [])
 
         # TODO: Profile image
 
