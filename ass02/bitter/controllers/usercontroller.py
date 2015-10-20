@@ -29,6 +29,9 @@ class UserController(Controller):
             res.status = 403
             return
 
+        if "listenedBy" in req.body:
+            del req.body["listenedBy"]
+
         user = super(UserController, cls).updateOne(req, res)
 
         if user:
@@ -52,6 +55,9 @@ class UserController(Controller):
         "email",
         "username",
         "password",
+        "name",
+        "profileImage",
+        "homeSuburb",
         "listeningTo",
         "listenedBy"
     ))
