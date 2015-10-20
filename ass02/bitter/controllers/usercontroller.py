@@ -1,7 +1,17 @@
 from bitter.controller import Controller
+from bitter.db import Coordinates
 from bitter.models.user import User
 
 class UserController(Controller):
+    @classmethod
+    def _whitelistParams(cls, params, extraWhitelist = set()):
+        if "homeCoordsLat" in params and "homeCoordsLon" in params:
+            params["homeCoords"] = Coordinates(lat = params.pop("homeCoordsLat"), lon = params.pop("homeCoordsLon"))
+        elif "homeCoords" in params:
+            del params["homeCoords"]
+
+        return super(UserController, cls)._whitelistParams(params, extraWhitelist)
+
     @classmethod
     def find(cls, req, res):
         try:
@@ -58,6 +68,7 @@ class UserController(Controller):
         "name",
         "profileImage",
         "description",
+        "homeCoords",
         "homeSuburb",
         "listeningTo",
         "listenedBy"

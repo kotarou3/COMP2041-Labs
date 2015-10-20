@@ -3,7 +3,7 @@ import os
 
 class Coordinates(object):
     def __init__(self, lat, lon):
-        self.lat, self.lon = lat, lon
+        self.lat, self.lon = float(lat), float(lon)
 
     def __repr__(self):
         return "<Coordinates {0:f}, {1:f}>".format(self.lat, self.lon)

@@ -1,9 +1,19 @@
 from datetime import datetime
 
 from bitter.controller import Controller
+from bitter.db import Coordinates
 from bitter.models.bleat import Bleat
 
 class BleatController(Controller):
+    @classmethod
+    def _whitelistParams(cls, params, extraWhitelist = set()):
+        if "locationCoordsLat" in params and "locationCoordsLon" in params:
+            params["locationCoords"] = Coordinates(lat = params.pop("locationCoordsLat"), lon = params.pop("locationCoordsLon"))
+        elif "locationCoords" in params:
+            del params["locationCoords"]
+
+        return super(BleatController, cls)._whitelistParams(params, extraWhitelist)
+
     @classmethod
     def find(cls, req, res):
         try:
@@ -57,5 +67,6 @@ class BleatController(Controller):
         "user",
         "inReplyTo",
         "content",
-        "timestamp"
+        "timestamp",
+        "locationCoords"
     ))
