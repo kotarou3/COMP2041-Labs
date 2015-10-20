@@ -12,7 +12,7 @@ schema = """
         password text not null,
 
         name text,
-        profile_image text,
+        profile_image file,
         description text,
         home_coords coordinates,
         home_suburb text

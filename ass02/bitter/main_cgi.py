@@ -1,15 +1,64 @@
 import cgi
+from cStringIO import StringIO
+import hashlib
 import os
+import shutil
 import sys
+import tempfile
 import unicodedata
 import urlparse
 
-from bitter.db import db
+from bitter.db import File, db
 from bitter.reqres import Request, Response
 from bitter.router import Router
 
+class BitterFieldStorage(cgi.FieldStorage):
+    def make_file(self, binary = True):
+        file = tempfile.NamedTemporaryFile(dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "uploads"))
+
+        # Build a SHA-256 hash of the file
+        setattr(file, "hash", hashlib.sha256())
+        def write(str):
+            file.hash.update(str)
+            return write.orig(str)
+        write.orig = file.write
+        file.write = write
+
+        return file
+
+    # XXX: Hack to have the data always write to a file when a filename is included
+    def read_lines(self):
+        if self.filename:
+            self.file = self.make_file()
+            self._FieldStorage__file = None
+        else:
+            self.file = self._FieldStorage__file = StringIO()
+
+        if self.outerboundary:
+            self.read_lines_to_outerboundary()
+        else:
+            self.read_lines_to_eof()
+
 def utf8Decode(str):
     return unicodedata.normalize("NFC", str.decode("utf8"))
+
+def getValueOrFile(field):
+    if field.file:
+        if field.done == -1:
+            field.file.close()
+            return None
+
+        if hasattr(field.file, "hash"):
+            hash = field.file.hash.hexdigest()
+            newPath = os.path.join(os.path.dirname(os.path.realpath(field.file.name)), hash)
+            if not os.path.exists(newPath):
+                shutil.move(field.file.name, newPath)
+                field.file.delete = False
+            field.file.close()
+
+            return File(hash = hash, name = utf8Decode(field.filename or hash))
+
+    return utf8Decode(field.value)
 
 res = Response(headers = {"Content-Type": "text/plain"})
 try:
@@ -37,12 +86,12 @@ try:
     # Parse the body and converting it to a dict
     body = {}
     if os.environ["REQUEST_METHOD"] in ("POST", "PATCH"):
-        fieldStorage = cgi.FieldStorage(keep_blank_values = True)
+        fieldStorage = BitterFieldStorage(keep_blank_values = True)
         for key in fieldStorage.keys():
             if isinstance(fieldStorage[key], list):
-                body[key] = map(lambda value: utf8Decode(value.value), fieldStorage[key])
+                body[key] = map(lambda value: getValueOrFile(value), fieldStorage[key])
             else:
-                body[key] = utf8Decode(fieldStorage[key].value)
+                body[key] = getValueOrFile(fieldStorage[key])
 
     req = Request(
         remoteAddress = os.environ["REMOTE_ADDR"],

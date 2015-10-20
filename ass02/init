@@ -1,4 +1,5 @@
 #!/bin/sh -e
 
+rm -f bitter/db.sqlite bitter/uploads/*
 python -m bitter.db_create
 python -m bitter.db_import dataset-huge

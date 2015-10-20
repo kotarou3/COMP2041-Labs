@@ -1,5 +1,5 @@
 from bitter.controller import Controller
-from bitter.db import Coordinates
+from bitter.db import Coordinates, File
 from bitter.models.user import User
 
 class UserController(Controller):
@@ -9,6 +9,9 @@ class UserController(Controller):
             params["homeCoords"] = Coordinates(lat = params.pop("homeCoordsLat"), lon = params.pop("homeCoordsLon"))
         elif "homeCoords" in params:
             del params["homeCoords"]
+
+        if "profileImage" in params and not isinstance(params["profileImage"], File):
+            del params["profileImage"]
 
         return super(UserController, cls)._whitelistParams(params, extraWhitelist)
 

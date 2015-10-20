@@ -1,8 +1,9 @@
 from datetime import datetime
+import hashlib
 import os
 import sys
 
-from bitter.db import Coordinates, db
+from bitter.db import Coordinates, File, db
 from bitter.models.user import User
 from bitter.models.bleat import Bleat
 
@@ -109,7 +110,19 @@ with db:
         # Don't add listens just yet, since not all users have been created yet
         listeningTo = user.pop("listeningTo", [])
 
-        # TODO: Profile image
+        try:
+            # SHA-256 hash the profile image and save it to the uploads directory
+            # XXX: Assumes it's small enough to fit in memory
+            with open(os.path.join(sys.argv[1], "users", username, "profile.jpg"), "rb") as handle:
+                profileImage = handle.read()
+            hash = hashlib.sha256(profileImage).hexdigest()
+
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "uploads", hash), "wb") as handle:
+                handle.write(profileImage)
+
+            user["profileImage"] = File(hash = hash, name = "profile.jpg")
+        except IOError:
+            pass
 
         users[user["username"]] = user = User.create(user)
 

@@ -3,7 +3,7 @@ import json
 import os
 import re
 
-from bitter.db import Coordinates
+from bitter.db import Coordinates, File
 from bitter.model import Model
 
 # Make datetime and normal classes JSON serialisable
@@ -16,7 +16,7 @@ def _jsonEncoderDefault(self, obj):
         elif isinstance(obj, Model):
             properties = vars(obj)
             return {key:properties[key] for key in obj.publicProperties.intersection(properties)}
-        elif isinstance(obj, Coordinates):
+        elif isinstance(obj, Coordinates) or isinstance(obj, File):
             return vars(obj)
         else:
             raise e
