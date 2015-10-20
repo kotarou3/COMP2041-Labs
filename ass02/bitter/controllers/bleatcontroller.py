@@ -5,6 +5,16 @@ from bitter.models.bleat import Bleat
 
 class BleatController(Controller):
     @classmethod
+    def find(cls, req, res):
+        try:
+            page = int(req.params.pop("page", 1))
+        except ValueError:
+            res.status = 400
+            return
+
+        return cls._Model.paginate(cls._whitelistParams(req.params, set(("search",))), page = page)
+
+    @classmethod
     def createOne(cls, req, res):
         if not req.user:
             res.status = 403

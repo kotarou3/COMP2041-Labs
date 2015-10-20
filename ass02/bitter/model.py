@@ -34,7 +34,7 @@ class Model(object):
             result["{0} {1} ?".format(
                 cls._toTableName(key),
                 value[0] if type(value) is tuple else "="
-            )] = value
+            )] = value[1] if type(value) is tuple else value
 
         return result
 
@@ -45,25 +45,28 @@ class Model(object):
 
         cur = db.cursor()
 
-        query = "select * from {0}".format(cls._toTableName(cls.__name__))
+        query = [
+            "select *",
+            "from {0}".format(cls._toTableName(cls.__name__))
+        ]
 
         if where:
             where = cls._buildWhereClause(where)
-            query += " where {0}".format(" and ".join(where.keys()))
+            query.append("where {0}".format(" and ".join(where.keys())))
 
         if orderBy:
-            query += " order by {0}".format(orderBy)
+            query.append("order by {0}".format(orderBy))
 
         if perPage:
             # Get total number of records so we can work out pages
-            cur.execute(query.replace("select * from", "select count(*) from"), where.values())
+            cur.execute(" ".join(["select count(*)"] + query[1:]), where.values())
             totalRecords = cur.fetchone()[0]
 
-            query += " limit {0:d}".format(perPage)
+            query.append("limit {0:d}".format(perPage))
             if page > 1:
-                query += " offset {0:d}".format(perPage * (page - 1))
+                query.append("offset {0:d}".format(perPage * (page - 1)))
 
-        cur.execute(query, where.values())
+        cur.execute(" ".join(query), where.values())
         records = map(cls, cur.fetchall())
 
         if not perPage:
