@@ -114,6 +114,8 @@ except:
 finally:
     db.close()
 
+    res.body = res.body.encode("utf8")
+
     res.headers["Content-Length"] = len(res.body)
 
     print "Status: {0}\r".format(res.status)
