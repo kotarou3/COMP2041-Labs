@@ -101,14 +101,17 @@ class Model(object):
     @classmethod
     def create(cls, properties):
         cur = db.cursor()
-        cur.execute(
-            "insert into {0} ({1}) values ({2})".format(
-                cls._toTableName(cls.__name__),
-                ", ".join(map(cls._toTableName, properties.keys())),
-                ", ".join(["?"] * len(properties))
-            ),
-            properties.values()
-        )
+        if properties:
+            cur.execute(
+                "insert into {0} ({1}) values ({2})".format(
+                    cls._toTableName(cls.__name__),
+                    ", ".join(map(cls._toTableName, properties.keys())),
+                    ", ".join(["?"] * len(properties))
+                ),
+                properties.values()
+            )
+        else:
+            cur.execute("insert into {0} default values".format(cls._toTableName(cls.__name__)))
 
         return cls.findOne({"id": cur.lastrowid})
 
