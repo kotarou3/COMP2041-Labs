@@ -57,6 +57,7 @@ class UserController(Controller):
         "password",
         "name",
         "profileImage",
+        "description",
         "homeSuburb",
         "listeningTo",
         "listenedBy"
