@@ -34,6 +34,15 @@ class UserController(Controller):
         return user
 
     @classmethod
+    def createOne(cls, req, res):
+        if "listeningTo" in req.body:
+            del req.body["listeningTo"]
+        if "listenedBy" in req.body:
+            del req.body["listenedBy"]
+
+        return super(UserController, cls).createOne(req, res)
+
+    @classmethod
     def updateOne(cls, req, res):
         if not req.user or str(req.user.id) != req.params["id"]:
             res.status = 403
