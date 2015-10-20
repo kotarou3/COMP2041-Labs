@@ -11,9 +11,9 @@ schema = """
         timestamp timestamp not null,
         location_coords coordinates
     );
-    create index bleat_user_timestamp on bleat(user, timestamp desc);
-    create index bleat_in_reply_to_timestamp on bleat(in_reply_to, timestamp desc);
-    create index bleat_timestamp on bleat(timestamp desc);
+    create unique index bleat_user_timestamp on bleat(user, timestamp desc, id desc);
+    create unique index bleat_in_reply_to_timestamp on bleat(in_reply_to, timestamp desc, id desc);
+    create unique index bleat_timestamp on bleat(timestamp desc, id desc);
 """
 
 class Bleat(Model):
