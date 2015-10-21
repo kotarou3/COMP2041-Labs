@@ -13,6 +13,7 @@ schema = """
 
         name text,
         profile_image file,
+        background_image file,
         description text,
         home_coords coordinates,
         home_suburb text
@@ -32,6 +33,7 @@ class User(Model):
         "username",
         "name",
         "profileImage",
+        "backgroundImage",
         "description",
         "homeCoords",
         "homeSuburb",

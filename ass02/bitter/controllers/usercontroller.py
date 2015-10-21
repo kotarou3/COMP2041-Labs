@@ -12,6 +12,8 @@ class UserController(Controller):
 
         if "profileImage" in params and not isinstance(params["profileImage"], File):
             del params["profileImage"]
+        if "backgroundImage" in params and not isinstance(params["backgroundImage"], File):
+            del params["backgroundImage"]
 
         return super(UserController, cls)._whitelistParams(params, extraWhitelist)
 
@@ -79,6 +81,7 @@ class UserController(Controller):
         "password",
         "name",
         "profileImage",
+        "backgroundImage",
         "description",
         "homeCoords",
         "homeSuburb",
