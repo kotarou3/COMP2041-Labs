@@ -8,6 +8,8 @@ import smtplib
 from bitter.controller import Controller
 from bitter.db import Coordinates, File
 from bitter.models.user import User
+from bitter.renderer import render
+from bitter.router import defaultRoutes
 
 _secret = "<random 128-bit hex string>".decode("hex")
 _emailServer = "<email server (must support STARTTLS)>"
@@ -117,6 +119,31 @@ class UserController(Controller):
 
         return super(UserController, cls).deleteOne(req, res)
 
+    @classmethod
+    def resetPasswordAndRender(cls, req, res):
+        req.body["email"] = getEmail(req.body.get("email", ""))
+        if not req.body["email"]:
+            res.status = 400
+            return
+
+        token = base64.b64encode(hmac.new(_secret, req.body["email"], hashlib.sha256).digest(), "-_")
+        if not "token" in req.body:
+            sendEmail(req.body["email"], "Bitter Password Reset Token", token)
+            return
+        elif req.body["token"] != token: # hmac.compare_digest() not available until v2.7.7
+            res.status = 400
+            return
+
+        if not "password" in req.body:
+            res.status = 400
+            return
+
+        if not User.update({"email": req.body["email"]}, {"password": req.body["password"]}):
+            res.status = 400
+            return
+
+        render(req, res, "user/reset-password.html.bepy")
+
     _Model = User
     _whitelistedProperties = set((
         "id",
@@ -132,3 +159,5 @@ class UserController(Controller):
         "listeningTo",
         "listenedBy"
     ))
+
+defaultRoutes[("POST", "^/user/reset-password")] = UserController.resetPasswordAndRender
