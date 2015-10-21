@@ -1,6 +1,36 @@
+import base64
+from email.utils import parseaddr
+from email.mime.text import MIMEText
+import hashlib
+import hmac
+import smtplib
+
 from bitter.controller import Controller
 from bitter.db import Coordinates, File
 from bitter.models.user import User
+
+_secret = "<random 128-bit hex string>".decode("hex")
+_emailServer = "<email server (must support STARTTLS)>"
+_emailAddr = "<email username>"
+_emailUsername = _emailAddr
+_emailPassword = "<email password>"
+
+def getEmail(email):
+    email = parseaddr(email)[1]
+    return email if "@" in email else None
+
+def sendEmail(to, subject, message):
+    msg = MIMEText(message)
+    msg["Subject"] = subject
+    msg["From"] = _emailAddr
+    msg["To"] = to
+
+    smtp = smtplib.SMTP(_emailServer, 587)
+    smtp.ehlo()
+    smtp.starttls()
+    smtp.login(_emailUsername, _emailPassword)
+    smtp.sendmail(_emailAddr, [to], msg.as_string())
+    smtp.close()
 
 class UserController(Controller):
     @classmethod
@@ -44,6 +74,20 @@ class UserController(Controller):
             del req.body["listeningTo"]
         if "listenedBy" in req.body:
             del req.body["listenedBy"]
+
+        req.body["email"] = getEmail(req.body.get("email", ""))
+        if not req.body["email"]:
+            res.status = 400
+            return
+
+        token = base64.b64encode(hmac.new(_secret, req.body["email"], hashlib.sha256).digest(), "-_")
+        if not "token" in req.body:
+            sendEmail(req.body["email"], "Bitter Registration Token", token)
+            res.status = 204
+            return
+        elif req.body["token"] != token: # hmac.compare_digest() not available until v2.7.7
+            res.status = 400
+            return
 
         return super(UserController, cls).createOne(req, res)
 
