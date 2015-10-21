@@ -85,8 +85,6 @@ class User(Model):
 
         if "listeningTo" in update:
             cur.execute("delete from user_listen where by in ({0})".format(", ".join(["?"] * len(ids))), ids)
-            if type(update["listeningTo"]) is str:
-                update["listeningTo"] = [update["listeningTo"]]
             if update["listeningTo"]:
                 cur.execute(
                     "insert into user_listen (by, to_) values {0}".format(", ".join(["(?, ?)"] * len(update["listeningTo"]))),
@@ -96,8 +94,6 @@ class User(Model):
 
         if "listenedBy" in update:
             cur.execute("delete from user_listen where to_ in ({0})".format(", ".join(["?"] * len(ids))), ids)
-            if type(update["listenedBy"]) is str:
-                update["listenedBy"] = [update["listenedBy"]]
             if update["listenedBy"]:
                 cur.execute(
                     "insert into user_listen (by, to_) values {0}".format(", ".join(["(?, ?)"] * len(update["listenedBy"]))),

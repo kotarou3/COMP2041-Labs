@@ -47,6 +47,11 @@ class UserController(Controller):
         if "backgroundImage" in params and not isinstance(params["backgroundImage"], File):
             del params["backgroundImage"]
 
+        if not type(update["listeningTo"]) is list:
+            update["listeningTo"] = [update["listeningTo"]]
+        if not type(update["listenedBy"]) is list:
+            update["listenedBy"] = [update["listenedBy"]]
+
         return super(UserController, cls)._whitelistParams(params, extraWhitelist)
 
     @classmethod
