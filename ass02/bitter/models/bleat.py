@@ -1,3 +1,5 @@
+import itertools
+
 from bitter.db import db
 from bitter.model import Model
 
@@ -31,6 +33,12 @@ schema = """
     create trigger bleat_ai after insert on bleat begin
         insert into bleat_content(docid, content) values (new.id, new.content);
     end;
+
+    create table bleat_attachment (
+        bleat integer not null references bleat(id) on delete cascade,
+        file file not null
+    );
+    create unique index bleat_attachment_bleat on bleat_attachment(bleat desc, file asc);
 """
 
 class Bleat(Model):
@@ -39,6 +47,7 @@ class Bleat(Model):
         "user",
         "inReplyTo",
         "content",
+        "attachments",
         "timestamp",
         "locationCoords"
     ))
@@ -46,49 +55,78 @@ class Bleat(Model):
 
     @classmethod
     def paginate(cls, where = {}, orderBy = Model._sentinel, page = 1, perPage = 20):
-        if not "search" in where:
-            return super(Bleat, cls).paginate(where, orderBy, page, perPage)
-
-        if orderBy is Model._sentinel:
-            # By number of matches, then by time and id
-            orderBy = "length(offsets(bleat_content)) - length(replace(offsets(bleat_content), \" \", \"\")) desc, timestamp desc, id desc"
-
         cur = db.cursor()
+        if not "search" in where:
+            bleats = super(Bleat, cls).paginate(where, orderBy, page, perPage)
+        else:
+            if orderBy is Model._sentinel:
+                # By number of matches, then by time and id
+                orderBy = "length(offsets(bleat_content)) - length(replace(offsets(bleat_content), \" \", \"\")) desc, timestamp desc, id desc"
 
-        query = [
-            "select bleat.*, offsets(bleat_content)",
-            "from bleat_content inner join bleat on id = docid"
-        ]
+            query = [
+                "select bleat.*, offsets(bleat_content)",
+                "from bleat_content inner join bleat on id = docid"
+            ]
 
-        where["bleat_content"] = ("match", where.pop("search"))
-        where = cls._buildWhereClause(where)
-        query.append("where {0}".format(" and ".join(where.keys())))
+            where["bleat_content"] = ("match", where.pop("search"))
+            where = cls._buildWhereClause(where)
+            query.append("where {0}".format(" and ".join(where.keys())))
 
-        if orderBy:
-            query.append("order by {0}".format(orderBy))
+            if orderBy:
+                query.append("order by {0}".format(orderBy))
 
-        if perPage:
-            # Get total number of records so we can work out pages
-            cur.execute(" ".join(["select count(*)"] + query[1:]), where.values())
-            totalRecords = cur.fetchone()[0]
+            if perPage:
+                # Get total number of records so we can work out pages
+                cur.execute(" ".join(["select count(*)"] + query[1:]), where.values())
+                totalRecords = cur.fetchone()[0]
 
-            query.append("limit {0:d}".format(perPage))
-            if page > 1:
-                query.append("offset {0:d}".format(perPage * (page - 1)))
+                query.append("limit {0:d}".format(perPage))
+                if page > 1:
+                    query.append("offset {0:d}".format(perPage * (page - 1)))
 
-        cur.execute(" ".join(query), where.values())
-        records = map(cls, cur.fetchall())
+            cur.execute(" ".join(query), where.values())
+            records = map(cls, cur.fetchall())
 
-        if not perPage:
-            totalRecords = len(records)
-        totalPages = (totalRecords + (perPage - 1)) / perPage if perPage else 1 # Ceiling division
+            if not perPage:
+                totalRecords = len(records)
+            totalPages = (totalRecords + (perPage - 1)) / perPage if perPage else 1 # Ceiling division
 
-        return {
-            "records": records,
-            "page": page,
-            "totalRecords": totalRecords,
-            "totalPages": totalPages
-        }
+            bleats = {
+                "records": records,
+                "page": page,
+                "totalRecords": totalRecords,
+                "totalPages": totalPages
+            }
+
+        # Joins? Nah, too lazy
+        for bleat in bleats["records"]:
+            cur.execute("select file from bleat_attachment where bleat = ?", (bleat.id,))
+            setattr(bleat, "attachments", map(lambda row: row["file"], cur.fetchall()))
+
+        return bleats
+
+    @classmethod
+    def findOne(cls, where = {}):
+        bleat = super(Bleat, cls).findOne(where)
+        if bleat:
+            cur = db.cursor()
+            cur.execute("select file from bleat_attachment where bleat = ?", (bleat.id,))
+            setattr(bleat, "attachments", map(lambda row: row["file"], cur.fetchall()))
+        return bleat
+
+    @classmethod
+    def create(cls, properties):
+        attachments = properties.pop("attachments", [])
+        bleat = super(Bleat, cls).create(properties)
+
+        if attachments:
+            db.execute(
+                "insert into bleat_attachment (bleat, file) values {0}".format(", ".join(["(?, ?)"] * len(attachments))),
+                list(itertools.chain.from_iterable(itertools.product((bleat.id,), attachments)))
+            )
+            setattr(bleat, "attachments", attachments)
+
+        return bleat
 
 """
 WITH RECURSIVE is_in_reply_to(id,in_reply_to,timestamp) AS (

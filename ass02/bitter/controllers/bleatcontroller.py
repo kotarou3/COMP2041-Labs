@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from bitter.controller import Controller
-from bitter.db import Coordinates
+from bitter.db import Coordinates, File
 from bitter.models.bleat import Bleat
 
 class BleatController(Controller):
@@ -11,6 +11,12 @@ class BleatController(Controller):
             params["locationCoords"] = Coordinates(lat = params.pop("locationCoordsLat"), lon = params.pop("locationCoordsLon"))
         elif "locationCoords" in params:
             del params["locationCoords"]
+
+        if "attachments" in params:
+            if not type(params["attachments"]) is list:
+                params["attachments"] = [params["attachments"]]
+            if not all([isinstance(attachment, File) for attachment in params["attachments"]]):
+                del params["attachments"]
 
         return super(BleatController, cls)._whitelistParams(params, extraWhitelist)
 
@@ -67,6 +73,7 @@ class BleatController(Controller):
         "user",
         "inReplyTo",
         "content",
+        "attachments",
         "timestamp",
         "locationCoords"
     ))
