@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime
 import hashlib
 import hmac
 
@@ -91,7 +92,22 @@ class UserController(Controller):
         else:
             del req.body["token"]
 
-        return super(UserController, cls).createOne(req, res)
+        user = super(UserController, cls).createOne(req, res)
+
+        # Automatically log the user in
+        if not req.user:
+            req.user = user
+
+            session = Session.create({
+                "user": user.id,
+                "passwordHash": user.passwordHash,
+                "lastAddress": req.remoteAddress,
+                "lastUse": datetime.utcnow()
+            })
+
+            res.cookies["session"] = session.id
+            res.cookies["session"]["httponly"] = True
+            res.cookies["session"]["max-age"] = 365 * 24 * 60 * 60 # 1 year should be permanent enough
 
     @classmethod
     def updateOne(cls, req, res):
