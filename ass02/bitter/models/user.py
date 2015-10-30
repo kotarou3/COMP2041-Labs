@@ -61,7 +61,8 @@ def canonicaliseUsername(username, ignoreSpaces = False, throws = True):
             stringprep.in_table_c6(char) or
             stringprep.in_table_c7(char) or
             stringprep.in_table_c8(char) or
-            stringprep.in_table_c9(char)):
+            stringprep.in_table_c9(char) or
+            stringprep.unicodedata.category(char) in ("Ps", "Pe", "Pi", "Pf", "Po")):
             if throws:
                 raise ValueError
             else:
