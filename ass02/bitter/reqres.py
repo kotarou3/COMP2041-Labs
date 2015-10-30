@@ -18,21 +18,21 @@ class Request(object):
 
         self.user = None
         if "session" in self.cookies:
-            session = Session.findOne({"id": self.cookies["session"].value})
-            if session:
+            self.session = Session.findOne({"id": self.cookies["session"].value})
+            if self.session:
                 self.user = User.findOne({
-                    "id": session.user,
-                    "password": session.password
+                    "id": self.session.user,
+                    "password": self.session.password
                 })
 
                 if self.user:
-                    session.lastAddress = self.remoteAddress
-                    session.lastUse = datetime.utcnow()
-                    session.save()
+                    self.session.lastAddress = self.remoteAddress
+                    self.session.lastUse = datetime.utcnow()
+                    self.session.save()
                     self.user.isDisabled = False
                     self.user.save()
                 else:
-                    session.erase()
+                    self.session.erase()
 
 class Response(object):
     def __init__(self, status = 0, headers = {}, cookies = None, body = ""):

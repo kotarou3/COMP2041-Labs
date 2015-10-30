@@ -10,6 +10,7 @@ schema = """
 
         user integer not null references user(id) on delete cascade,
         password text not null,
+        csrf_token text unique not null,
 
         last_address text not null,
         last_use timestamp not null
@@ -20,8 +21,8 @@ schema = """
 
 class Session(Model):
     publicProperties = set((
-        "id",
         "user",
+        "csrfToken",
         "lastAddress",
         "lastUse"
     ))
@@ -30,6 +31,7 @@ class Session(Model):
     @classmethod
     def create(cls, properties):
         properties["id"] = base64.b64encode(os.urandom(16), "-_")
+        properties["csrf_token"] = base64.b64encode(os.urandom(16), "-_")
 
         cur = db.cursor()
         cur.execute(

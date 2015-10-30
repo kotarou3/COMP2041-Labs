@@ -61,6 +61,11 @@ class SessionController(Controller):
     def updateOne(cls, req, res):
         res.status = 405
 
+    @classmethod
+    def deleteOne(cls, req, res):
+        req.params = {"csrfToken": req.params["id"]}
+        return super(SessionController, cls).deleteOne(req, res)
+
     _Model = Session
 
 defaultRoutes[("DELETE", "^/session/(?P<id>[a-zA-Z0-9-_=]+)$")] = SessionController.deleteOneAndRender

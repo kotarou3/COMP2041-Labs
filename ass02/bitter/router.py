@@ -44,6 +44,12 @@ class Router(object):
         self.routes[path][method] = handler
 
     def route(self, req, res):
+        if (req.user and not req.method in ("GET", "HEAD", "OPTIONS", "TRACE") and
+            req.params.pop("csrfToken", "") != req.session.csrfToken and
+            req.body.pop("csrfToken", "") != req.session.csrfToken):
+            res.status = 400
+            return
+
         for possibleRoute, handlers in self.routes.iteritems():
             match = possibleRoute.match(req.path)
             if match:
