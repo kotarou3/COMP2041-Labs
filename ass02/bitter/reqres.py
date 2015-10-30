@@ -5,9 +5,10 @@ from bitter.models.session import Session
 from bitter.models.user import User
 
 class Request(object):
-    def __init__(self, remoteAddress, method, path, fileext, params, headers, body):
+    def __init__(self, remoteAddress, method, baseUri, path, fileext, params, headers, body):
         self.remoteAddress = remoteAddress
         self.method = method
+        self.baseUri = baseUri
         self.path = path
         self.fileext = fileext
         self.params = params

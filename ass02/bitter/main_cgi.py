@@ -100,6 +100,7 @@ try:
     req = Request(
         remoteAddress = os.environ["REMOTE_ADDR"],
         method = os.environ["REQUEST_METHOD"],
+        baseUri = os.environ.get("SCRIPT_URI", "").decode("utf8")[0:-len(os.environ.get("PATH_INFO", "").decode("utf8"))],
         path = path,
         fileext = fileext,
         headers = headers,
@@ -123,6 +124,9 @@ finally:
     else:
         res.body = res.body.encode("utf8")
         res.headers["Content-Length"] = len(res.body)
+
+    if res.headers.get("Location", "").startswith("/"):
+        res.headers["Location"] = req.baseUri + res.headers["Location"]
 
     print "Status: {0}\r".format(res.status)
     for key, value in res.headers.iteritems():

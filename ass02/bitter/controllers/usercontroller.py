@@ -1,41 +1,15 @@
 import base64
-from email.utils import parseaddr
-from email.mime.text import MIMEText
 import hashlib
 import hmac
-import smtplib
 
 from bitter.controller import Controller
+from bitter.emailer import sendEmail, validateEmail
 from bitter.db import Coordinates, File
 from bitter.models.user import User, canonicaliseUsername
 from bitter.renderer import render
 from bitter.router import defaultRoutes
 
 _secret = "<random 128-bit hex string>".decode("hex")
-_emailServer = "<email server (must support STARTTLS)>"
-_emailAddr = "<email username>"
-_emailUsername = _emailAddr
-_emailPassword = "<email password>"
-
-def sendEmail(to, subject, message):
-    msg = MIMEText(message)
-    msg["Subject"] = subject
-    msg["From"] = _emailAddr
-    msg["To"] = to
-
-    smtp = smtplib.SMTP(_emailServer, 587)
-    smtp.ehlo()
-    smtp.starttls()
-    smtp.login(_emailUsername, _emailPassword)
-    smtp.sendmail(_emailAddr, [to], msg.as_string())
-    smtp.close()
-
-def validateEmail(email):
-    email = parseaddr(email)[1]
-    if not "@" in email:
-        raise ValueError
-
-    return email
 
 def validateUsername(username):
     canonicaliseUsername(username)
@@ -73,6 +47,9 @@ class UserController(Controller):
 
     updateOneSchema = overallSchema.copy()
     del updateOneSchema["listenedBy"]
+    updateOneSchema["notifyOnMention"] = bool
+    updateOneSchema["notifyOnReply"] = bool
+    updateOneSchema["notifyOnListen"] = bool
 
     @classmethod
     def findOne(cls, req, res):
@@ -82,6 +59,12 @@ class UserController(Controller):
             user.populate("bleats")
             user.populate("listeningTo")
             user.populate("listenedBy")
+
+            if req.user and req.user.id == user.id:
+                user.publicProperties = user.publicProperties.copy()
+                user.publicProperties.add("notifyOnMention")
+                user.publicProperties.add("notifyOnReply")
+                user.publicProperties.add("notifyOnListen")
 
         return user
 
@@ -116,6 +99,11 @@ class UserController(Controller):
             user.populate("bleats")
             user.populate("listeningTo")
             user.populate("listenedBy")
+
+            user.publicProperties = user.publicProperties.copy()
+            user.publicProperties.add("notifyOnMention")
+            user.publicProperties.add("notifyOnReply")
+            user.publicProperties.add("notifyOnListen")
 
         return user
 
@@ -161,6 +149,50 @@ class UserController(Controller):
 
         render(req, res, "user/reset-password.html.bepy")
 
+    @classmethod
+    def listenAndRender(cls, req, res):
+        req.params = cls._validateParams({"id": int, "unlisten": bool}, req.params)
+
+        if not req.user:
+            res.status = 403
+            return
+
+        targetUser = User.findOne({"id": req.params["id"]})
+        if not targetUser:
+            res.status = 404
+            return
+
+        req.user.populate("listeningTo")
+        if req.params["unlisten"]:
+            if targetUser.id in req.user.listeningTo:
+                req.user.listeningTo.discard(targetUser.id)
+            else:
+                res.status = 400
+                return
+        else:
+            if targetUser.id in req.user.listeningTo:
+                res.status = 400
+                return
+            else:
+                req.user.listeningTo.add(targetUser.id)
+        req.user.save()
+
+        if not req.params["unlisten"] and targetUser.notifyOnListen:
+            sendEmail(
+                targetUser.email,
+                "Bitter Listen Notification",
+                u"{0} is now listening to your bleats.\n\n{1}".format(
+                    req.user.name or req.user.username,
+                    u"{0}/user/{1}".format(req.baseUri, req.user.id)
+                )
+            )
+
+        targetUser.populate("bleats")
+        targetUser.populate("listeningTo")
+        targetUser.populate("listenedBy")
+        render(req, res, "user/findOne.html.bepy", targetUser)
+
     _Model = User
 
 defaultRoutes[("POST", "^/user/reset-password")] = UserController.resetPasswordAndRender
+defaultRoutes[("POST", "^/user/:id/(?P<unlisten>un|)listen")] = UserController.listenAndRender

@@ -19,7 +19,11 @@ schema = """
         background_image file,
         description text,
         home_coords coordinates,
-        home_suburb text
+        home_suburb text,
+
+        notify_on_mention integer,
+        notify_on_reply integer,
+        notify_on_listen integer
     );
 
     create table user_listen (
@@ -94,13 +98,13 @@ class User(Model):
         cur = db.cursor()
         if attribute == "bleats":
             cur.execute("select id from bleat where user = ?", (self.id,))
-            setattr(self, "bleats", map(lambda row: row["id"], cur.fetchall()))
+            setattr(self, "bleats", set(map(lambda row: row["id"], cur.fetchall())))
         elif attribute == "listeningTo":
             cur.execute("select to_ from user_listen where by = ?", (self.id,))
-            setattr(self, "listeningTo", map(lambda row: row["to_"], cur.fetchall()))
+            setattr(self, "listeningTo", set(map(lambda row: row["to_"], cur.fetchall())))
         elif attribute == "listenedBy":
             cur.execute("select by from user_listen where to_ = ?", (self.id,))
-            setattr(self, "listenedBy", map(lambda row: row["by"], cur.fetchall()))
+            setattr(self, "listenedBy", set(map(lambda row: row["by"], cur.fetchall())))
         else:
             raise LookupError("User models do not contain {0} relations".format(attribute))
 
