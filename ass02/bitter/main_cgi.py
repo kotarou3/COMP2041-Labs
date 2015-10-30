@@ -60,6 +60,10 @@ def getValueOrFile(field):
 
     return utf8Decode(field.value)
 
+# CSE pipes stderr to the client as well, which we don't want, so we pipe it to a log instead
+logfile = open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "stderr.log"), "w")
+os.dup2(logfile.fileno(), sys.stderr.fileno())
+
 res = Response(headers = {"Content-Type": "text/plain"})
 try:
     # Extract the file extension if any
@@ -114,9 +118,11 @@ except:
 finally:
     db.close()
 
-    res.body = res.body.encode("utf8")
-
-    res.headers["Content-Length"] = len(res.body)
+    if isinstance(res.body, file):
+        res.headers["Content-Length"] = os.fstat(res.body.fileno()).st_size - res.body.tell()
+    else:
+        res.body = res.body.encode("utf8")
+        res.headers["Content-Length"] = len(res.body)
 
     print "Status: {0}\r".format(res.status)
     for key, value in res.headers.iteritems():
@@ -125,4 +131,7 @@ finally:
         print res.cookies.output() + "\r"
     print "\r"
 
-    sys.stdout.write(res.body)
+    if isinstance(res.body, file):
+        shutil.copyfileobj(res.body, sys.stdout)
+    else:
+        sys.stdout.write(res.body)

@@ -1,11 +1,15 @@
-import importlib
 import re
 
 from bitter.renderer import render
 
 defaultRoutes = {}
-for name in "user", "bleat", "session":
-    controller = getattr(importlib.import_module("bitter.controllers.{0}controller".format(name)), name.capitalize() + "Controller")()
+
+from bitter.controllers.bleatcontroller import BleatController
+from bitter.controllers.sessioncontroller import SessionController
+from bitter.controllers.uploadcontroller import UploadController
+from bitter.controllers.usercontroller import UserController
+for controller in BleatController, SessionController, UploadController, UserController:
+    name = re.match("([a-zA-Z]+)Controller", controller.__name__).group(1).lower()
     if (hasattr(controller, "findAndRender")):
         defaultRoutes[("GET", "^/{0}/?$".format(name))] = controller.findAndRender
     if (hasattr(controller, "findOneAndRender")):

@@ -1,8 +1,8 @@
-import importlib
-
 from bitter.db import db
+import bitter.models.bleat
+import bitter.models.session
+import bitter.models.user
 
 with db:
-    for name in "user", "bleat", "session":
-        model = importlib.import_module("bitter.models.{0}".format(name))
+    for model in bitter.models.bleat, bitter.models.session, bitter.models.user:
         db.executescript(model.schema)

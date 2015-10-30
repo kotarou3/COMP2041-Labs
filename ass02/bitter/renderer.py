@@ -12,10 +12,12 @@ def _jsonEncoderDefault(self, obj):
         return _jsonEncoderDefault.orig(obj)
     except TypeError as e:
         if isinstance(obj, datetime):
-            return (obj - datetime.utcfromtimestamp(0)).total_seconds()
+            # .total_seconds() only available with v2.7
+            td = obj - datetime.utcfromtimestamp(0)
+            return (td.microseconds + (td.seconds + td.days * 86400) * 10**6) / 10.0**6
         elif isinstance(obj, Model):
             properties = vars(obj)
-            return {key:properties[key] for key in obj.publicProperties.intersection(properties)}
+            return dict(((key, properties[key]) for key in obj.publicProperties.intersection(properties)))
         elif isinstance(obj, Coordinates) or isinstance(obj, File):
             return vars(obj)
         else:
