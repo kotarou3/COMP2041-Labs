@@ -2,6 +2,7 @@ import itertools
 
 from bitter.db import db
 from bitter.model import Model
+from bitter.models.user import User, canonicaliseUsername
 
 schema = """
     create table bleat (
@@ -34,6 +35,13 @@ schema = """
         insert into bleat_content(docid, content) values (new.id, new.content);
     end;
 
+    create table bleat_mention (
+        bleat integer not null references bleat(id) on delete cascade,
+        user integer not null references user(id) on delete cascade
+    );
+    create unique index bleat_mention_bleat on bleat_mention(bleat, user);
+    create index bleat_mention_user on bleat_mention(user);
+
     create table bleat_attachment (
         bleat integer not null references bleat(id) on delete cascade,
         file file not null
@@ -47,11 +55,24 @@ class Bleat(Model):
         "user",
         "inReplyTo",
         "content",
+        "mentions",
         "attachments",
         "timestamp",
         "locationCoords"
     ))
     defaultOrderBy = "timestamp desc, id desc"
+
+    @classmethod
+    def _buildWhereClause(cls, where):
+        home = where.pop("home", "")
+        result = super(Bleat, cls)._buildWhereClause(where)
+
+        if home:
+            # XXX: Horrible hack to get `or`s where only `and`s were intended
+            # (`home` = user id of whose home we're showing)
+            result["(user = ? or user in (select to_ from user_listen where by = {0:d}) or id in (select bleat from bleat_mention where user = {0:d}))".format(home)] = home
+
+        return result
 
     @classmethod
     def paginate(cls, where = {}, orderBy = Model._sentinel, page = 1, perPage = 20):
@@ -100,8 +121,10 @@ class Bleat(Model):
 
         # Joins? Nah, too lazy
         for bleat in bleats["records"]:
+            cur.execute("select user from bleat_mention where bleat = ?", (bleat.id,))
+            setattr(bleat, "mentions", set(map(lambda row: row["user"], cur.fetchall())))
             cur.execute("select file from bleat_attachment where bleat = ?", (bleat.id,))
-            setattr(bleat, "attachments", map(lambda row: row["file"], cur.fetchall()))
+            setattr(bleat, "attachments", set(map(lambda row: row["file"], cur.fetchall())))
 
         return bleats
 
@@ -110,14 +133,48 @@ class Bleat(Model):
         bleat = super(Bleat, cls).findOne(where)
         if bleat:
             cur = db.cursor()
+            cur.execute("select user from bleat_mention where bleat = ?", (bleat.id,))
+            setattr(bleat, "mentions", set(map(lambda row: row["user"], cur.fetchall())))
             cur.execute("select file from bleat_attachment where bleat = ?", (bleat.id,))
-            setattr(bleat, "attachments", map(lambda row: row["file"], cur.fetchall()))
+            setattr(bleat, "attachments", set(map(lambda row: row["file"], cur.fetchall())))
         return bleat
 
     @classmethod
     def create(cls, properties):
         attachments = properties.pop("attachments", [])
         bleat = super(Bleat, cls).create(properties)
+
+        # Find all mentioned users
+        mentions = set()
+        startIndex = 0
+        while startIndex < len(bleat.content):
+            startIndex = bleat.content.find("@", startIndex)
+            if startIndex < 0:
+                break
+            startIndex += 1
+
+            # Could binary search, but usernames generally aren't very long
+            username = ""
+            endIndex = startIndex + 1
+            try:
+                for endIndex in xrange(startIndex + 1, len(bleat.content) + 1):
+                    username = canonicaliseUsername(bleat.content[startIndex:endIndex])
+            except ValueError:
+                pass
+
+            if username:
+                user = User.findOne({"canonicalUsername": username})
+                if user:
+                    mentions.add(user.id)
+
+            startIndex = endIndex
+
+        if mentions:
+            db.execute(
+                "insert into bleat_mention (bleat, user) values {0}".format(", ".join(["(?, ?)"] * len(mentions))),
+                list(itertools.chain.from_iterable(itertools.product((bleat.id,), mentions)))
+            )
+            setattr(bleat, "mentions", mentions)
 
         if attachments:
             db.execute(
@@ -127,11 +184,3 @@ class Bleat(Model):
             setattr(bleat, "attachments", attachments)
 
         return bleat
-
-"""
-WITH RECURSIVE is_in_reply_to(id,in_reply_to,timestamp) AS (
-    SELECT id,in_reply_to,timestamp FROM bleat WHERE id=?
-    UNION ALL
-    SELECT bleat.id,bleat.in_reply_to,bleat.timestamp FROM bleat,is_in_reply_to WHERE bleat.in_reply_to=is_in_reply_to.id  order by bleat.timestamp desc)
-SELECT * FROM is_in_reply_to;
-"""

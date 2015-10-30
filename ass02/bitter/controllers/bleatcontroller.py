@@ -5,6 +5,8 @@ from bitter.emailer import sendEmail
 from bitter.db import Coordinates, File
 from bitter.models.bleat import Bleat
 from bitter.models.user import User, canonicaliseUsername
+from bitter.renderer import render
+from bitter.router import defaultRoutes
 
 def validateAttachment(file):
     if not file.mime.startswith("image/"): # Only images for now...
@@ -23,12 +25,24 @@ class BleatController(Controller):
     }
 
     findSchema = overallSchema.copy()
+    findSchema["home"] = bool
     findSchema["page"] = int
     findSchema["search"] = unicode
 
     createOneSchema = overallSchema.copy()
     del createOneSchema["user"]
     del createOneSchema["timestamp"]
+
+    @classmethod
+    def find(cls, req, res):
+        if "home" in req.params:
+            if req.user:
+                req.params["home"] = req.user.id
+            else:
+                del req.params["home"]
+                render(req, res, "session/new.html.bepy")
+
+        return super(BleatController, cls).find(req, res)
 
     @classmethod
     def createOne(cls, req, res):
@@ -45,29 +59,11 @@ class BleatController(Controller):
 
         bleat = super(BleatController, cls).createOne(req, res)
 
-        # Find all mentioned users
-        mentionedUsernames = set()
-        startIndex = 0
-        while startIndex < len(bleat.content):
-            startIndex = bleat.content.find("@", startIndex)
-            if startIndex < 0:
-                break
-            startIndex += 1
-
-            endIndex = len(bleat.content)
-            while endIndex > startIndex:
-                try:
-                    mentionedUsernames.add(canonicaliseUsername(bleat.content[startIndex:endIndex]))
-                    break
-                except ValueError:
-                    endIndex -= 1
-
-            startIndex = endIndex
-
+        # Find all mentioned users that want notifications
         usersToNotify = {}
-        for username in mentionedUsernames:
-            user = User.findOne({"canonicalUsername": username})
-            if user and user.notifyOnMention and not user.isDisabled:
+        for userId in bleat.mentions:
+            user = User.findOne({"id": userId})
+            if user.notifyOnMention and not user.isDisabled:
                 usersToNotify[user.id] = user
 
         # Find out who we're replying to and send a notification email if needed
@@ -89,7 +85,7 @@ class BleatController(Controller):
                     )
                 )
 
-        # Notify the mentioned users if needed
+        # Send the mentioned notifications
         for user in usersToNotify.values():
             sendEmail(
                 user.email,
@@ -125,3 +121,5 @@ class BleatController(Controller):
         return True
 
     _Model = Bleat
+
+defaultRoutes[("GET", "^(?P<home>/index|/|)$")] = BleatController.findAndRender
