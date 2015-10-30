@@ -219,6 +219,6 @@ class UserController(Controller):
 
     _Model = User
 
-defaultRoutes[("POST", "^/user/reset-password")] = UserController.resetPasswordAndRender
-defaultRoutes[("POST", "^/user/:id/disable")] = UserController.disableAndRender
-defaultRoutes[("POST", "^/user/:id/(?P<unlisten>un|)listen")] = UserController.listenAndRender
+defaultRoutes[("POST", "^/user/reset-password$")] = UserController.resetPasswordAndRender
+defaultRoutes[("POST", "^/user/:id/disable$")] = UserController.disableAndRender
+defaultRoutes[("POST", "^/user/:id/(?P<unlisten>un|)listen$")] = UserController.listenAndRender
