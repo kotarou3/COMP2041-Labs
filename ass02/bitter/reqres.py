@@ -22,7 +22,7 @@ class Request(object):
             if self.session:
                 self.user = User.findOne({
                     "id": self.session.user,
-                    "password": self.session.password
+                    "passwordHash": self.session.passwordHash
                 })
 
                 if self.user:

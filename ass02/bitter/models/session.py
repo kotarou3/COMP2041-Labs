@@ -9,7 +9,7 @@ schema = """
         id text primary key,
 
         user integer not null references user(id) on delete cascade,
-        password text not null,
+        password_hash text not null,
         csrf_token text unique not null,
 
         last_address text not null,

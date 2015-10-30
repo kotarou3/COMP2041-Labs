@@ -1,6 +1,11 @@
+import base64
+import hashlib
+import hmac
 import itertools
+import os
 import re
 import stringprep
+import struct
 
 from bitter.db import db
 from bitter.model import Model
@@ -12,7 +17,7 @@ schema = """
         email text unique not null,
         canonical_username text unique not null,
         username text unique not null,
-        password text not null,
+        password_hash text not null,
         is_disabled integer,
 
         name text,
@@ -81,6 +86,38 @@ def canonicaliseUsername(username, ignoreSpaces = False, throws = True):
 
     return chars
 
+def pbkdf2(password, salt, iters, keylen, digestmod):
+    h = hmac.new(password, digestmod = digestmod)
+    def prf(data):
+        hm = h.copy()
+        hm.update(buffer(data))
+        return bytearray(hm.digest())
+
+    key = bytearray()
+    i = 1
+    while len(key) < keylen:
+        T = U = prf(salt + struct.pack(">i", i))
+        for _ in xrange(iters - 1):
+            U = prf(U)
+            T = bytearray(x ^ y for x, y in zip(T, U))
+        key += T
+        i += 1
+
+    return key[:keylen]
+
+def hashPassword(password):
+    iters = 100000
+    salt = os.urandom(32)
+    hash = pbkdf2(password.encode("utf8"), salt, iters, 32, hashlib.sha256)
+    return "{0}${1}${2}".format(iters, base64.b64encode(salt), base64.b64encode(hash))
+
+def checkPassword(password, hashedPassword):
+    iters, salt, hash = hashedPassword.split("$")
+    iters = int(iters)
+    salt = base64.b64decode(salt)
+    hash = base64.b64decode(hash)
+    return pbkdf2(password.encode("utf8"), salt, iters, 32, hashlib.sha256) == hash
+
 class User(Model):
     publicProperties = set((
         "id",
@@ -133,6 +170,8 @@ class User(Model):
     def create(cls, properties):
         if "username" in properties:
             properties["canonicalUsername"] = canonicaliseUsername(properties["username"], throws = False)
+        if "password" in properties:
+            properties["passwordHash"] = hashPassword(properties.pop("password"))
 
         return super(User, cls).create(properties)
 
@@ -152,6 +191,8 @@ class User(Model):
 
         if "username" in update:
             update["canonicalUsername"] = canonicaliseUsername(update["username"], throws = False)
+        if "password" in update:
+            update["passwordHash"] = hashPassword(update.pop("password"))
 
         if "listeningTo" in update:
             cur.execute("delete from user_listen where by in ({0})".format(", ".join(["?"] * len(ids))), ids)

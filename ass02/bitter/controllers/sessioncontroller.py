@@ -2,7 +2,7 @@ from datetime import datetime
 
 from bitter.controller import Controller
 from bitter.models.session import Session
-from bitter.models.user import User
+from bitter.models.user import User, checkPassword
 from bitter.renderer import render
 from bitter.router import defaultRoutes
 
@@ -32,8 +32,9 @@ class SessionController(Controller):
 
     @classmethod
     def createOne(cls, req, res):
+        password = req.body.pop("password", "")
         user = User.findOne(req.body)
-        if not user:
+        if not user or not checkPassword(password, user.passwordHash):
             res.status = 400
             render(req, res, "session/new.html.bepy")
             return
@@ -43,7 +44,7 @@ class SessionController(Controller):
 
         session = Session.create({
             "user": user.id,
-            "password": user.password,
+            "passwordHash": user.passwordHash,
             "lastAddress": req.remoteAddress,
             "lastUse": datetime.utcnow()
         })

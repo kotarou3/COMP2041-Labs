@@ -137,7 +137,12 @@ class UserController(Controller):
             res.status = 400
             return
 
-        token = base64.b64encode(hmac.new(_secret, req.body["email"], hashlib.sha256).digest(), "-_")
+        user = User.findOne({"email": req.body["email"]})
+        if not user:
+            res.status = 400
+            return
+
+        token = base64.b64encode(hmac.new(_secret, req.body["email"] + user.passwordHash, hashlib.sha256).digest(), "-_")
         if not "token" in req.body:
             sendEmail(req.body["email"], "Bitter Password Reset Token", token)
             return
@@ -149,9 +154,8 @@ class UserController(Controller):
             res.status = 400
             return
 
-        if not User.update({"email": req.body["email"]}, {"password": req.body["password"]}):
-            res.status = 400
-            return
+        user.password = req.body["password"]
+        user.save()
 
         render(req, res, "user/reset-password.html.bepy")
 
