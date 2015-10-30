@@ -12,6 +12,7 @@ class Request(object):
         self.path = path
         self.fileext = fileext
         self.params = params
+        self.origParams = params.copy()
         self.headers = headers
         self.cookies = SimpleCookie(headers.get("Cookie", ""))
         self.body = body

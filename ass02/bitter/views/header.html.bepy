@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title>Bitter :: <%= title %></title>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" integrity="sha512-dTfge/zgoMYpP7QbHy4gWMEGsbsdZeCXz7irItjcC3sPUFtf0kuFbDz/ixG7ArTxmDjLXDmezHubeNikyKGVyQ==" crossorigin="anonymous" />
+        <script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js" integrity="sha512-K1qjQ+NcF2TYO/eI3M6v8EiNYZfA95pQumfvcVrTHtwQVDG+aHRqLi/ETn2uB+1JqwYqVG3LIvdm9lj6imS/pQ==" crossorigin="anonymous"></script>
+        <script>
+            function listen(targetState, userId) {
+                $.post("<%= req.baseUri + "/user/" %>" + userId + "/" + (targetState ? "" : "un") + "listen", {csrfToken: "<%= req.session.csrfToken if req.user else "" %>"})
+                .done(function () {
+                    location.reload();
+                }).fail(function () {
+                    alert("Failed to " + (targetState ? "" : "un") + "listen to the user for some reason.");
+                });
+            }
+        </script>
+    </head>
+<% if "backgroundImage" in vars() and backgroundImage: %>
+    <body style="background-image: url(<%= req.baseUri + "/upload/" + backgroundImage.hash %>)">
+<% else: %>
+    <body>
+<% %>
+        <div class="container" style="background-color: white">
+            <nav class="navbar navbar-default">
+                <div class="container-fluid">
+                    <div class="navbar-header"><a class="navbar-brand" href="<%= req.baseUri + "/" %>">Bitter</a></div>
+                    <ul class="nav navbar-nav">
+                        <li><a href="<%= req.baseUri + "/user" %>">Users</a></li>
+                        <li><a href="<%= req.baseUri + "/bleat" %>">Bleats</a></li>
+                    </ul>
+                    <form class="navbar-form navbar-left" style="width: 50%" method="GET" action="<%= req.baseUri + ("/user" if req.path.startswith("/user") else "/bleat") %>">
+                        <div class="form-group" style="width: 70%"><input type="text" class="form-control" style="width: 100%" name="search" placeholder="Search <%= "Users" if req.path.startswith("/user") else "Bleats" %>" /></div>
+                        <button type="submit" class="btn btn-default">Submit</button>
+                    </form>
+                    <ul class="nav navbar-nav navbar-right">
+                        <% if req.user: %>
+                            <% req.user.populate("listeningTo") %>
+                            <li><a href="<%= req.baseUri + "/bleat/new" %>">New Bleat</a></li>
+                            <li class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown"><%= req.user.name or req.user.username %> <span class="caret"></span></a>
+                                <ul class="dropdown-menu">
+                                    <li><a href="<%= req.baseUri + "/user/" + unicode(req.user.id) %>">View Profile</a></li>
+                                    <li><a href="<%= req.baseUri + "/user/" + unicode(req.user.id) + "/edit" %>">Edit Profile and Settings</a></li>
+                                    <li class="divider"></li>
+                                    <script>
+                                        function logout() {
+                                            $.ajax("<%= req.baseUri + "/session/" + req.session.csrfToken %>.json?csrfToken=<%= req.session.csrfToken %>", {method: "DELETE"})
+                                            .done(function () {
+                                                location.reload();
+                                            })
+                                            .fail(function () {
+                                                alert("Logout Failure. Somehow.");
+                                            });
+                                        }
+                                    </script>
+                                    <li><a href="#" onclick="logout()">Logout</a></li>
+                                </ul>
+                            </li>
+                        <% else: %>
+                            <li><a href="<%= req.baseUri + "/" %>">Login</a></li>
+                        <% %>
+                    </ul>
+                </div>
+            </nav>

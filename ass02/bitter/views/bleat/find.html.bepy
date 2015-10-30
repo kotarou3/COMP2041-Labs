@@ -1,0 +1,33 @@
+<% include("header.html.bepy", {"title": "Bleats"}) %>
+<% import hashlib %>
+<% from bitter.models.user import User %>
+<% for bleat in model["records"]: %>
+    <% user = User.findOne({"id": bleat.user}) %>
+    <a class="btn btn-default" style="width: 100%" href="<%= req.baseUri + "/bleat/" + unicode(bleat.id) %>">
+        <div class="row">
+            <div class="col-md-2">
+                <% if user.profileImage: %>
+                    <img style="width: 100px; height: 100px" src="<%= req.baseUri + "/upload/" + user.profileImage.hash %>" />
+                <% else: %>
+                    <img style="width: 100px; height: 100px" src="<%= "https://www.gravatar.com/avatar/{0}?d=identicon&s=100".format(hashlib.md5(user.email).hexdigest()) %>" />
+                <% %>
+            </div>
+            <div class="col-md-10">
+                <h5><strong><%= user.name or user.username %> (@<%= user.username %>) at <%= bleat.timestamp.ctime() %>:</strong></h5>
+                <p><%= bleat.content %></p>
+                <% if req.user: %>
+                    <p>
+                        <% if user.id in req.user.listeningTo: %>
+                            <button class="btn btn-default active" onclick="listen(false, <%= user.id %>)">Unlisten from <%= user.name or user.username %></button>
+                        <% else: %>
+                            <button class="btn btn-default" onclick="listen(true, <%= user.id %>)">Listen to <%= user.name or user.username %></button>
+                        <% %>
+                        <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(bleat.id) %>">Reply</a>
+                    </p>
+                <% %>
+            </div>
+        </div>
+    </a>
+<% %>
+<% include("pagination.html.bepy", {"model": model}) %>
+<% include("footer.html.bepy") %>

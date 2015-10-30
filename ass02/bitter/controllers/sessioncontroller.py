@@ -56,6 +56,8 @@ class SessionController(Controller):
         res.status = 201
         res.headers["Location"] = "/session/{0}".format(session.id)
 
+        render(req, res, "redirect-home.html.bepy")
+
         return session
 
     @classmethod

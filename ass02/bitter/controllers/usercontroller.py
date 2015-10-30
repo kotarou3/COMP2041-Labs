@@ -96,8 +96,6 @@ class UserController(Controller):
 
         # Automatically log the user in
         if not req.user:
-            req.user = user
-
             session = Session.create({
                 "user": user.id,
                 "passwordHash": user.passwordHash,
@@ -108,6 +106,9 @@ class UserController(Controller):
             res.cookies["session"] = session.id
             res.cookies["session"]["httponly"] = True
             res.cookies["session"]["max-age"] = 365 * 24 * 60 * 60 # 1 year should be permanent enough
+
+            req.user = user
+            req.session = session
 
     @classmethod
     def updateOne(cls, req, res):
@@ -130,12 +131,35 @@ class UserController(Controller):
         return user
 
     @classmethod
+    def updateOneAndRenderViaWeb(cls, req, res):
+        # Remove blank params (except the boolean ones)
+        for key, value in req.body.items():
+            if not value and not key.startswith("notify"):
+                del req.body[key]
+
+        return super(UserController, cls).updateOneAndRender(req, res)
+
+    @classmethod
     def deleteOne(cls, req, res):
         if not req.user or req.user.id != req.params["id"]:
             res.status = 403
             return
 
         return super(UserController, cls).deleteOne(req, res)
+
+    @classmethod
+    def renderEdit(cls, req, res):
+        try:
+            req.params = cls._validateParams({"id": int}, req.params)
+        except (TypeError, ValueError):
+            res.status = 400
+            return
+
+        if not req.user or req.user.id != req.params["id"]:
+            res.status = 403
+            return
+
+        render(req, res, "user/edit.html.bepy", User.findOne(req.params))
 
     @classmethod
     def resetPasswordAndRender(cls, req, res):
@@ -173,7 +197,7 @@ class UserController(Controller):
         user.password = req.body["password"]
         user.save()
 
-        render(req, res, "user/reset-password.html.bepy")
+        render(req, res, "redirect-home.html.bepy")
 
     @classmethod
     def disableAndRender(cls, req, res):
@@ -239,6 +263,8 @@ class UserController(Controller):
 
     _Model = User
 
+defaultRoutes[("GET", "^/user/:id/edit$")] = UserController.renderEdit
+defaultRoutes[("POST", "^/user/:id/edit$")] = UserController.updateOneAndRenderViaWeb
 defaultRoutes[("POST", "^/user/reset-password$")] = UserController.resetPasswordAndRender
 defaultRoutes[("POST", "^/user/:id/disable$")] = UserController.disableAndRender
 defaultRoutes[("POST", "^/user/:id/(?P<unlisten>un|)listen$")] = UserController.listenAndRender

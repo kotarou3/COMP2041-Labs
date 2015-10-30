@@ -1,0 +1,5 @@
+<% include("header.html.bepy", {"title": "Redirection"}) %>
+<script>
+    location = "<%= req.baseUri + "/" %>";
+</script>
+<% include("footer.html.bepy") %>

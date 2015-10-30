@@ -137,8 +137,8 @@ class User(Model):
     def populate(self, attribute):
         cur = db.cursor()
         if attribute == "bleats":
-            cur.execute("select id from bleat where user = ?", (self.id,))
-            setattr(self, "bleats", set(map(lambda row: row["id"], cur.fetchall())))
+            cur.execute("select id from bleat where user = ? order by timestamp desc", (self.id,))
+            setattr(self, "bleats", map(lambda row: row["id"], cur.fetchall()))
         elif attribute == "listeningTo":
             cur.execute("select to_ from user_listen where by = ?", (self.id,))
             setattr(self, "listeningTo", set(map(lambda row: row["to_"], cur.fetchall())))

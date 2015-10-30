@@ -1,0 +1,48 @@
+<% include("header.html.bepy", {"title": "Profile and Settings"}) %>
+<% import hashlib %>
+<% from bitter.models.bleat import Bleat %>
+<% from bitter.models.user import User %>
+
+<form id="editUser" method="POST" action="<%= req.baseUri + "/user/" + unicode(model.id) + "/edit" %>" enctype="multipart/form-data">
+    <input type="hidden" name="csrfToken" value="<%= req.session.csrfToken %>" />
+    <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" class="form-control" name="email" placeholder="E-mail" value="<%= model.email %>" />
+    </div>
+    <div class="form-group">
+        <label>Username</label>
+        <input type="text" class="form-control" name="username" placeholder="Username" value="<%= model.username %>" />
+    </div>
+    <div class="form-group">
+        <label>Password</label>
+        <input type="password" class="form-control" name="password" />
+    </div>
+    <div class="form-group">
+        <label>Display Name</label>
+        <input type="text" class="form-control" name="name" placeholder="Display Name" value="<%= model.name or "" %>" />
+    </div>
+    <div class="form-group">
+        <label>Profile Image (Defaults to Gravatar)</label>
+        <input type="file" class="form-control" name="profileImage" />
+    </div>
+    <div class="form-group">
+        <label>Background Image</label>
+        <input type="file" class="form-control" name="backgroundImage" />
+    </div>
+    <div class="form-group">
+        <label>Description</label>
+        <textarea class="form-control" name="description" placeholder="Description goes here" maxlength="16384"><%= model.description or "" %></textarea>
+    </div>
+    <div class="checkbox">
+        <label><input type="checkbox" name="notifyOnMention" <% outputRaw("checked=\"checked\"" if model.notifyOnMention else "") %> /> Notification on Mention</label>
+    </div>
+    <div class="checkbox">
+        <label><input type="checkbox" name="notifyOnReply" <% outputRaw("checked=\"checked\"" if model.notifyOnReply else "") %> /> Notification on Reply</label>
+    </div>
+    <div class="checkbox">
+        <label><input type="checkbox" name="notifyOnListen" <% outputRaw("checked=\"checked\"" if model.notifyOnListen else "") %> /> Notification on Listen</label>
+    </div>
+    <button type="submit" class="btn btn-default">Save</button>
+</form>
+
+<% include("footer.html.bepy") %>

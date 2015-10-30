@@ -1,0 +1,16 @@
+<% import urllib %>
+<nav style="text-align: center">
+    <ul class="pagination">
+        <% existingQuery = req.origParams.copy() %>
+        <% for page in sorted(set([1, model["totalPages"]] + range(model["page"] - 5, model["page"] + 6))): %>
+            <% existingQuery["page"] = page %>
+            <% if page <= 0 or model["totalPages"] < page: %>
+                <% continue %>
+            <% elif page == model["page"]: %>
+                <li class="active"><a href="?<%= urllib.urlencode(existingQuery) %>"><%= page %></a></li>
+            <% else: %>
+                <li><a href="?<%= urllib.urlencode(existingQuery) %>"><%= page %></a></li>
+            <% %>
+        <% %>
+    </ul>
+</nav>

@@ -1,0 +1,53 @@
+<% include("header.html.bepy", {"title": u"User :: {0}".format(model.name or model.username), "backgroundImage": model.backgroundImage}) %>
+<% import hashlib %>
+<% from bitter.models.bleat import Bleat %>
+<div class="row">
+    <div class="col-md-3">
+        <% if model.profileImage: %>
+            <img style="width: 250px; height: 250px" src="<%= req.baseUri + "/upload/" + model.profileImage.hash %>" />
+        <% else: %>
+            <img style="width: 250px; height: 250px" src="<%= "https://www.gravatar.com/avatar/{0}?d=identicon&s=250".format(hashlib.md5(model.email).hexdigest()) %>" />
+        <% %>
+    </div>
+    <div class="col-md-9">
+        <% if req.user: %>
+            <p>
+            <% if model.id == req.user.id: %>
+                <a class="btn btn-default" href="<%= req.baseUri + "/user/" + unicode(model.id) + "/edit" %>">Edit Profile and Settings</a>
+            <% %>
+            <% if model.id in req.user.listeningTo: %>
+                <button class="btn btn-default active" onclick="listen(false, <%= model.id %>)">Unlisten</button>
+            <% else: %>
+                <button class="btn btn-default" onclick="listen(true, <%= model.id %>)">Listen</button>
+            <% %>
+            </p>
+        <% %>
+        <h5><strong><%= model.name or model.username %> (@<%= model.username %>):</strong></h5>
+        <p><%= model.description or "(Empty Description)" %></p>
+    </div>
+</div>
+<% for bleatId in model.bleats[:20]: %>
+    <% bleat = Bleat.findOne({"id": bleatId}) %>
+    <a class="btn btn-default" style="width: 100%" href="<%= req.baseUri + "/bleat/" + unicode(bleat.id) %>">
+        <div class="row">
+            <div class="col-md-2">
+                <% if model.profileImage: %>
+                    <img style="width: 100px; height: 100px" src="<%= req.baseUri + "/upload/" + model.profileImage.hash %>" />
+                <% else: %>
+                    <img style="width: 100px; height: 100px" src="<%= "https://www.gravatar.com/avatar/{0}?d=identicon&s=100".format(hashlib.md5(model.email).hexdigest()) %>" />
+                <% %>
+            </div>
+            <div class="col-md-10">
+                <h5><strong><%= model.name or model.username %> (@<%= model.username %>) at <%= bleat.timestamp.ctime() %>:</strong></h5>
+                <p><%= bleat.content %></p>
+                <% if req.user: %>
+                    <p><a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(bleat.id) %>">Reply</a></p>
+                <% %>
+            </div>
+        </div>
+    </a>
+<% %>
+<% if len(model.bleats) > 20: %>
+    <nav style="text-align: center"><a class="row" href="<%= req.baseUri + "/bleat?page=2&user=" + unicode(model.id) %>">See more of this user's bleats</a></nav>
+<% %>
+<% include("footer.html.bepy") %>

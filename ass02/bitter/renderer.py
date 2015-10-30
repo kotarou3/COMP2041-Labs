@@ -73,12 +73,15 @@ def runBepy(bepy, params):
             elif part.startswith("="):
                 # Output shorthand
                 translatedBepy.append("    " * indentLevel + "output(eval(" + repr(part[1:]) + "))")
-            elif part.startswith("for "):
-                # Loop start
+            elif part.startswith("for ") or part.startswith("if "):
+                # Block start
                 translatedBepy.append("    " * indentLevel + part)
                 indentLevel += 1
+            elif part.startswith("elif ") or part.startswith("else:"):
+                # Block continuation
+                translatedBepy.append("    " * (indentLevel - 1) + part)
             elif not part:
-                # Loop end
+                # Block end
                 indentLevel -= 1
             else:
                 translatedBepy.append("    " * indentLevel + part)
@@ -90,11 +93,11 @@ def runBepy(bepy, params):
     import sys
     sys.stderr.write("\n".join(translatedBepy) + "\n")
 
-    result = {"s": ""} # Hack to allow output functions to modify it
+    result = {"s": u""} # Hack to allow output functions to modify it
     def outputRaw(s):
-        result["s"] += str(s)
+        result["s"] += s if isinstance(s, basestring) else unicode(s)
     def output(s):
-        outputRaw(escape(str(s)))
+        outputRaw(escape(s if isinstance(s, basestring) else unicode(s)))
 
     def include(view, params2 = {}):
         if "req" in params:

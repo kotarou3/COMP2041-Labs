@@ -1,0 +1,28 @@
+<% include("header.html.bepy", {"title": "Users"}) %>
+<% import hashlib %>
+<% for user in model["records"]: %>
+    <a class="btn btn-default" href="<%= req.baseUri + "/user/" + unicode(user.id) %>">
+        <div class="row">
+            <div class="col-md-3">
+                <% if user.profileImage: %>
+                    <img style="width: 100px; height: 100px" src="<%= req.baseUri + "/upload/" + user.profileImage.hash %>" />
+                <% else: %>
+                    <img style="width: 100px; height: 100px" src="<%= "https://www.gravatar.com/avatar/{0}?d=identicon&s=100".format(hashlib.md5(user.email).hexdigest()) %>" />
+                <% %>
+            </div>
+            <div class="col-md-9">
+                <h5><strong><%= user.name or user.username %> (@<%= user.username %>):</strong></h5>
+                <p><%= user.description or "(Empty Description)" %></p>
+                <% if req.user: %>
+                    <% if user.id in req.user.listeningTo: %>
+                        <p><button class="btn btn-default active" onclick="event.preventDefault(); listen(false, <%= user.id %>)">Unlisten</button></p>
+                    <% else: %>
+                        <p><button class="btn btn-default" onclick="event.preventDefault(); listen(true, <%= user.id %>)">Listen</button></p>
+                    <% %>
+                <% %>
+            </div>
+        </div>
+    </a>
+<% %>
+<% include("pagination.html.bepy", {"model": model}) %>
+<% include("footer.html.bepy") %>

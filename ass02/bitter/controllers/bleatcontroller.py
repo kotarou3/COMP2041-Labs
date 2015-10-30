@@ -122,4 +122,5 @@ class BleatController(Controller):
 
     _Model = Bleat
 
+defaultRoutes[("GET", "^/bleat/new$")] = lambda req, res: render(req, res, "bleat/new.html.bepy")
 defaultRoutes[("GET", "^(?P<home>/index|/|)$")] = BleatController.findAndRender

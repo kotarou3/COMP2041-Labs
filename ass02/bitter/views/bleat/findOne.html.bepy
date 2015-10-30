@@ -1,0 +1,89 @@
+<% include("header.html.bepy", {"title": "Bleat"}) %>
+<% import hashlib %>
+<% from bitter.models.bleat import Bleat %>
+<% from bitter.models.user import User %>
+
+<% if model.inReplyTo: %>
+    <% inReplyTo = Bleat.findOne({"id": model.inReplyTo}) %>
+    <% inReplyToUser = User.findOne({"id": inReplyTo.user}) %>
+    <a class="btn btn-default" style="width: 100%" href="<%= req.baseUri + "/bleat/" + unicode(inReplyTo.id) %>">
+        <div class="row">
+            <div class="col-md-2">
+                <% if inReplyToUser.profileImage: %>
+                    <img style="width: 100px; height: 100px" src="<%= req.baseUri + "/upload/" + inReplyToUser.profileImage.hash %>" />
+                <% else: %>
+                    <img style="width: 100px; height: 100px" src="<%= "https://www.gravatar.com/avatar/{0}?d=identicon&s=100".format(hashlib.md5(inReplyToUser.email).hexdigest()) %>" />
+                <% %>
+            </div>
+            <div class="col-md-10">
+                <h5><strong><%= inReplyToUser.name or inReplyToUser.username %> (@<%= inReplyToUser.username %>) at <%= inReplyTo.timestamp.ctime() %>:</strong></h5>
+                <p><%= inReplyTo.content %></p>
+                <% if req.user: %>
+                    <p>
+                        <% if inReplyToUser.id in req.user.listeningTo: %>
+                            <button class="btn btn-default active" onclick="listen(false, <%= inReplyToUser.id %>)">Unlisten from <%= inReplyToUser.name or inReplyToUser.username %></button>
+                        <% else: %>
+                            <button class="btn btn-default" onclick="listen(true, <%= inReplyToUser.id %>)">Listen to <%= inReplyToUser.name or inReplyToUser.username %></button>
+                        <% %>
+                        <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(inReplyTo.id) %>">Reply</a>
+                    </p>
+                <% %>
+            </div>
+        </div>
+    </a>
+<% %>
+
+<% user = User.findOne({"id": model.user}) %>
+<div class="row">
+    <div class="col-md-3">
+        <% if user.profileImage: %>
+            <img style="width: 250px; height: 250px" src="<%= req.baseUri + "/upload/" + user.profileImage.hash %>" />
+        <% else: %>
+            <img style="width: 250px; height: 250px" src="<%= "https://www.gravatar.com/avatar/{0}?d=identicon&s=250".format(hashlib.md5(user.email).hexdigest()) %>" />
+        <% %>
+    </div>
+    <div class="col-md-9">
+        <h5><strong><%= user.name or user.username %> (@<%= user.username %>) at <%= model.timestamp.ctime() %>:</strong></h5>
+        <p><%= model.content %></p>
+        <% if req.user: %>
+            <p>
+                <% if user.id in req.user.listeningTo: %>
+                    <button class="btn btn-default active" onclick="listen(false, <%= user.id %>)">Unlisten from <%= user.name or user.username %></button>
+                <% else: %>
+                    <button class="btn btn-default" onclick="listen(true, <%= user.id %>)">Listen to <%= user.name or user.username %></button>
+                <% %>
+                <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(model.id) %>">Reply</a>
+            </p>
+        <% %>
+    </div>
+</div>
+
+<% for response in Bleat.find({"inReplyTo": model.id}): %>
+    <% responseUser = User.findOne({"id": response.user}) %>
+    <a class="btn btn-default" style="width: 100%" href="<%= req.baseUri + "/bleat/" + unicode(response.id) %>">
+        <div class="row">
+            <div class="col-md-2">
+                <% if responseUser.profileImage: %>
+                    <img style="width: 100px; height: 100px" src="<%= req.baseUri + "/upload/" + responseUser.profileImage.hash %>" />
+                <% else: %>
+                    <img style="width: 100px; height: 100px" src="<%= "https://www.gravatar.com/avatar/{0}?d=identicon&s=100".format(hashlib.md5(responseUser.email).hexdigest()) %>" />
+                <% %>
+            </div>
+            <div class="col-md-10">
+                <h5><strong><%= responseUser.name or responseUser.username %> (@<%= responseUser.username %>) at <%= response.timestamp.ctime() %>:</strong></h5>
+                <p><%= response.content %></p>
+                <% if req.user: %>
+                    <p>
+                        <% if responseUser.id in req.user.listeningTo: %>
+                            <button class="btn btn-default active" onclick="listen(false, <%= responseUser.id %>)">Unlisten from <%= responseUser.name or responseUser.username %></button>
+                        <% else: %>
+                            <button class="btn btn-default" onclick="listen(true, <%= responseUser.id %>)">Listen to <%= responseUser.name or responseUser.username %></button>
+                        <% %>
+                        <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(response.id) %>">Reply</a>
+                    </p>
+                <% %>
+            </div>
+        </div>
+    </a>
+<% %>
+<% include("footer.html.bepy") %>

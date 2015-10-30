@@ -1,0 +1,37 @@
+<% include("header.html.bepy", {"title": "New Bleat"}) %>
+<% import hashlib %>
+<% from bitter.models.bleat import Bleat %>
+<% from bitter.models.user import User %>
+
+<% if "inReplyTo" in req.params and Bleat.findOne({"id": req.params["inReplyTo"]}): %>
+    <% inReplyTo = Bleat.findOne({"id": req.params["inReplyTo"]}) %>
+    <% inReplyToUser = User.findOne({"id": inReplyTo.user}) %>
+    <h3>Replying to Bleat</h3>
+    <div class="row">
+        <div class="col-md-2">
+            <% if inReplyToUser.profileImage: %>
+                <img style="width: 100px; height: 100px" src="<%= req.baseUri + "/upload/" + inReplyToUser.profileImage.hash %>" />
+            <% else: %>
+                <img style="width: 100px; height: 100px" src="<%= "https://www.gravatar.com/avatar/{0}?d=identicon&s=100".format(hashlib.md5(inReplyToUser.email).hexdigest()) %>" />
+            <% %>
+        </div>
+        <div class="col-md-10">
+            <h5><strong><%= inReplyToUser.name or inReplyToUser.username %> (@<%= inReplyToUser.username %>) at <%= inReplyTo.timestamp.ctime() %>:</strong></h5>
+            <p><%= inReplyTo.content %></p>
+        </div>
+    </div>
+<% else: %>
+    <% req.params.pop("inReplyTo", "") %>
+    <h3>New Bleat</h3>
+<% %>
+
+<form method="POST" action="<%= req.baseUri + "/bleat" %>">
+    <input type="hidden" name="csrfToken" value="<%= req.session.csrfToken %>" />
+    <% if "inReplyTo" in req.params: %>
+        <input type="hidden" name="inReplyTo" value="<%= req.params["inReplyTo"] %>" />
+    <% %>
+    <div class="form-group"><textarea class="form-control" name="content" placeholder="Bleat goes here" required="required" maxlength="142"></textarea></div>
+    <button type="submit" class="btn btn-default">Bleat</button>
+</form>
+
+<% include("footer.html.bepy") %>
