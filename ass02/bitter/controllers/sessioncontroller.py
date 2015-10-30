@@ -38,6 +38,9 @@ class SessionController(Controller):
             render(req, res, "session/new.html.bepy")
             return
 
+        user.isDisabled = False
+        user.save()
+
         session = Session.create({
             "user": user.id,
             "password": user.password,

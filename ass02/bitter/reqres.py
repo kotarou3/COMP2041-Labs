@@ -29,6 +29,8 @@ class Request(object):
                     session.lastAddress = self.remoteAddress
                     session.lastUse = datetime.utcnow()
                     session.save()
+                    self.user.isDisabled = False
+                    self.user.save()
                 else:
                     session.erase()
 

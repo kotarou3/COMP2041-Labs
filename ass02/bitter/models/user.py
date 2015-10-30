@@ -13,6 +13,7 @@ schema = """
         canonical_username text unique not null,
         username text unique not null,
         password text not null,
+        is_disabled integer,
 
         name text,
         profile_image file,
@@ -84,6 +85,7 @@ class User(Model):
         "id",
         "username",
         "name",
+        "isDisabled",
         "profileImage",
         "backgroundImage",
         "description",

@@ -67,7 +67,7 @@ class BleatController(Controller):
         usersToNotify = {}
         for username in mentionedUsernames:
             user = User.findOne({"canonicalUsername": username})
-            if user and user.notifyOnMention:
+            if user and user.notifyOnMention and not user.isDisabled:
                 usersToNotify[user.id] = user
 
         # Find out who we're replying to and send a notification email if needed
@@ -75,7 +75,7 @@ class BleatController(Controller):
             inReplyTo = Bleat.findOne({"id": bleat.inReplyTo})
             inReplyToUser = User.findOne({"id": inReplyTo.user})
 
-            if inReplyToUser.notifyOnReply:
+            if inReplyToUser.notifyOnReply and not inReplyToUser.isDisabled:
                 if inReplyToUser.id in usersToNotify:
                     del usersToNotify[inReplyToUser.id] # Don't send two emails to a single person
 

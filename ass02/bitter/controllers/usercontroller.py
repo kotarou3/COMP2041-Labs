@@ -5,6 +5,7 @@ import hmac
 from bitter.controller import Controller
 from bitter.emailer import sendEmail, validateEmail
 from bitter.db import Coordinates, File
+from bitter.models.session import Session
 from bitter.models.user import User, canonicaliseUsername
 from bitter.renderer import render
 from bitter.router import defaultRoutes
@@ -50,6 +51,11 @@ class UserController(Controller):
     updateOneSchema["notifyOnMention"] = bool
     updateOneSchema["notifyOnReply"] = bool
     updateOneSchema["notifyOnListen"] = bool
+
+    @classmethod
+    def find(cls, req, res):
+        req.params["isDisabled"] = False
+        return super(UserController, cls).find(req, res)
 
     @classmethod
     def findOne(cls, req, res):
@@ -150,6 +156,25 @@ class UserController(Controller):
         render(req, res, "user/reset-password.html.bepy")
 
     @classmethod
+    def disableAndRender(cls, req, res):
+        try:
+            req.params = cls._validateParams({"id": int}, req.params)
+        except (TypeError, ValueError):
+            res.status = 400
+            return
+
+        if not req.user or req.user.id != req.params["id"]:
+            res.status = 403
+            return
+
+        req.user.isDisabled = True
+        req.user.save()
+
+        Session.delete({"user": req.user.id})
+
+        render(req, res, "user/disable.html.bepy")
+
+    @classmethod
     def listenAndRender(cls, req, res):
         req.params = cls._validateParams({"id": int, "unlisten": bool}, req.params)
 
@@ -177,7 +202,7 @@ class UserController(Controller):
                 req.user.listeningTo.add(targetUser.id)
         req.user.save()
 
-        if not req.params["unlisten"] and targetUser.notifyOnListen:
+        if not req.params["unlisten"] and targetUser.notifyOnListen and not targetUser.isDisabled:
             sendEmail(
                 targetUser.email,
                 "Bitter Listen Notification",
@@ -195,4 +220,5 @@ class UserController(Controller):
     _Model = User
 
 defaultRoutes[("POST", "^/user/reset-password")] = UserController.resetPasswordAndRender
+defaultRoutes[("POST", "^/user/:id/disable")] = UserController.disableAndRender
 defaultRoutes[("POST", "^/user/:id/(?P<unlisten>un|)listen")] = UserController.listenAndRender
