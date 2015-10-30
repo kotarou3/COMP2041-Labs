@@ -18,7 +18,7 @@ schema = """
         canonical_username text unique not null,
         username text unique not null,
         password_hash text not null,
-        is_disabled integer,
+        is_disabled integer default 0 not null,
 
         name text,
         profile_image file,
