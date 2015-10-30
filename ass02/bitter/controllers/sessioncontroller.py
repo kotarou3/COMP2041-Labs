@@ -58,14 +58,6 @@ class SessionController(Controller):
     def updateOne(cls, req, res):
         res.status = 405
 
-    @classmethod
-    def deleteOne(cls, req, res):
-        if "session" in req.cookies and req.cookies["session"].value == req.params["id"]:
-            res.cookies["session"] = ""
-            res.cookies["session"]["max-age"] = -1
-
-        return Session.delete({"id": req.params["id"]})
-
     _Model = Session
 
 defaultRoutes[("DELETE", "^/session/(?P<id>[a-zA-Z0-9-_=]+)$")] = SessionController.deleteOneAndRender
