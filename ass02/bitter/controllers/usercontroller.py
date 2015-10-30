@@ -7,7 +7,7 @@ import smtplib
 
 from bitter.controller import Controller
 from bitter.db import Coordinates, File
-from bitter.models.user import User
+from bitter.models.user import User, canonicaliseUsername
 from bitter.renderer import render
 from bitter.router import defaultRoutes
 
@@ -16,10 +16,6 @@ _emailServer = "<email server (must support STARTTLS)>"
 _emailAddr = "<email username>"
 _emailUsername = _emailAddr
 _emailPassword = "<email password>"
-
-def getEmail(email):
-    email = parseaddr(email)[1]
-    return email if "@" in email else None
 
 def sendEmail(to, subject, message):
     msg = MIMEText(message)
@@ -34,35 +30,49 @@ def sendEmail(to, subject, message):
     smtp.sendmail(_emailAddr, [to], msg.as_string())
     smtp.close()
 
+def validateEmail(email):
+    email = parseaddr(email)[1]
+    if not "@" in email:
+        raise ValueError
+
+    return email
+
+def validateUsername(username):
+    canonicaliseUsername(username)
+    return username
+
+def validateImage(file):
+    if not file.mime.startswith("image/"):
+        raise ValueError
+    return file
+
 class UserController(Controller):
-    @classmethod
-    def _whitelistParams(cls, params, extraWhitelist = set()):
-        if "homeCoordsLat" in params and "homeCoordsLon" in params:
-            params["homeCoords"] = Coordinates(lat = params.pop("homeCoordsLat"), lon = params.pop("homeCoordsLon"))
-        elif "homeCoords" in params:
-            del params["homeCoords"]
+    overallSchema = {
+        "id": int,
+        "email": (unicode, validateEmail),
+        "username": (unicode, validateUsername),
+        "password": unicode,
+        "name": unicode,
+        "profileImage": (File, validateImage),
+        "backgroundImage": (File, validateImage),
+        "description": (unicode, 16384),
+        "homeCoords": Coordinates,
+        "homeSuburb": unicode,
+        "listeningTo": (list, int),
+        "listenedBy": (list, int)
+    }
 
-        if "profileImage" in params and not isinstance(params["profileImage"], File):
-            del params["profileImage"]
-        if "backgroundImage" in params and not isinstance(params["backgroundImage"], File):
-            del params["backgroundImage"]
+    findSchema = overallSchema.copy()
+    findSchema["page"] = int
+    findSchema["search"] = unicode
 
-        if not type(update["listeningTo"]) is list:
-            update["listeningTo"] = [update["listeningTo"]]
-        if not type(update["listenedBy"]) is list:
-            update["listenedBy"] = [update["listenedBy"]]
+    createOneSchema = overallSchema.copy()
+    createOneSchema["token"] = unicode
+    del createOneSchema["listeningTo"]
+    del createOneSchema["listenedBy"]
 
-        return super(UserController, cls)._whitelistParams(params, extraWhitelist)
-
-    @classmethod
-    def find(cls, req, res):
-        try:
-            page = int(req.params.pop("page", 1))
-        except ValueError:
-            res.status = 400
-            return
-
-        return cls._Model.paginate(cls._whitelistParams(req.params, set(("search",))), page = page)
+    updateOneSchema = overallSchema.copy()
+    del updateOneSchema["listenedBy"]
 
     @classmethod
     def findOne(cls, req, res):
@@ -77,13 +87,7 @@ class UserController(Controller):
 
     @classmethod
     def createOne(cls, req, res):
-        if "listeningTo" in req.body:
-            del req.body["listeningTo"]
-        if "listenedBy" in req.body:
-            del req.body["listenedBy"]
-
-        req.body["email"] = getEmail(req.body.get("email", ""))
-        if not req.body["email"]:
+        if not "email" in req.body:
             res.status = 400
             return
 
@@ -95,17 +99,16 @@ class UserController(Controller):
         elif req.body["token"] != token: # hmac.compare_digest() not available until v2.7.7
             res.status = 400
             return
+        else:
+            del req.body["token"]
 
         return super(UserController, cls).createOne(req, res)
 
     @classmethod
     def updateOne(cls, req, res):
-        if not req.user or str(req.user.id) != req.params["id"]:
+        if not req.user or req.user.id != req.params["id"]:
             res.status = 403
             return
-
-        if "listenedBy" in req.body:
-            del req.body["listenedBy"]
 
         user = super(UserController, cls).updateOne(req, res)
 
@@ -118,7 +121,7 @@ class UserController(Controller):
 
     @classmethod
     def deleteOne(cls, req, res):
-        if not req.user or str(req.user.id) != req.params["id"]:
+        if not req.user or req.user.id != req.params["id"]:
             res.status = 403
             return
 
@@ -126,7 +129,16 @@ class UserController(Controller):
 
     @classmethod
     def resetPasswordAndRender(cls, req, res):
-        req.body["email"] = getEmail(req.body.get("email", ""))
+        try:
+            req.body = cls._validateParams({
+                "email": (unicode, validateEmail),
+                "token": unicode,
+                "password": unicode
+            }, req.body)
+        except (TypeError, ValueError):
+            res.status = 400
+            return
+
         if not req.body["email"]:
             res.status = 400
             return
@@ -150,19 +162,5 @@ class UserController(Controller):
         render(req, res, "user/reset-password.html.bepy")
 
     _Model = User
-    _whitelistedProperties = set((
-        "id",
-        "email",
-        "username",
-        "password",
-        "name",
-        "profileImage",
-        "backgroundImage",
-        "description",
-        "homeCoords",
-        "homeSuburb",
-        "listeningTo",
-        "listenedBy"
-    ))
 
 defaultRoutes[("POST", "^/user/reset-password")] = UserController.resetPasswordAndRender

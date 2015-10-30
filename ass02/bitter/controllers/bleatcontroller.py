@@ -4,31 +4,29 @@ from bitter.controller import Controller
 from bitter.db import Coordinates, File
 from bitter.models.bleat import Bleat
 
+def validateAttachment(file):
+    if not file.mime.startswith("image/"): # Only images for now...
+        raise ValueError
+    return file
+
 class BleatController(Controller):
-    @classmethod
-    def _whitelistParams(cls, params, extraWhitelist = set()):
-        if "locationCoordsLat" in params and "locationCoordsLon" in params:
-            params["locationCoords"] = Coordinates(lat = params.pop("locationCoordsLat"), lon = params.pop("locationCoordsLon"))
-        elif "locationCoords" in params:
-            del params["locationCoords"]
+    overallSchema = {
+        "id": int,
+        "user": int,
+        "inReplyTo": int,
+        "content": (unicode, 142),
+        "attachments": (list, File, validateAttachment),
+        "timestamp": unicode,
+        "locationCoords": Coordinates
+    }
 
-        if "attachments" in params:
-            if not type(params["attachments"]) is list:
-                params["attachments"] = [params["attachments"]]
-            if not all([isinstance(attachment, File) for attachment in params["attachments"]]):
-                del params["attachments"]
+    findSchema = overallSchema.copy()
+    findSchema["page"] = int
+    findSchema["search"] = unicode
 
-        return super(BleatController, cls)._whitelistParams(params, extraWhitelist)
-
-    @classmethod
-    def find(cls, req, res):
-        try:
-            page = int(req.params.pop("page", 1))
-        except ValueError:
-            res.status = 400
-            return
-
-        return cls._Model.paginate(cls._whitelistParams(req.params, set(("search",))), page = page)
+    createOneSchema = overallSchema.copy()
+    del createOneSchema["user"]
+    del createOneSchema["timestamp"]
 
     @classmethod
     def createOne(cls, req, res):
@@ -36,7 +34,7 @@ class BleatController(Controller):
             res.status = 403
             return
 
-        if not "content" in req.body or not 1 <= len(req.body["content"]) <= 142:
+        if not "content" in req.body or len(req.body["content"]) < 1:
             res.status = 400
             return
 
@@ -55,9 +53,8 @@ class BleatController(Controller):
             res.status = 403
             return
 
-        bleat = Bleat.findOne(cls._whitelistParams(req.params))
+        bleat = Bleat.findOne(req.params)
         if not bleat:
-            res.status = 404
             return
 
         if req.user.id != bleat.user:
@@ -68,12 +65,3 @@ class BleatController(Controller):
         return True
 
     _Model = Bleat
-    _whitelistedProperties = set((
-        "id",
-        "user",
-        "inReplyTo",
-        "content",
-        "attachments",
-        "timestamp",
-        "locationCoords"
-    ))

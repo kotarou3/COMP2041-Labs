@@ -1,4 +1,6 @@
 import itertools
+import re
+import stringprep
 
 from bitter.db import db
 from bitter.model import Model
@@ -8,6 +10,7 @@ schema = """
         id integer primary key,
 
         email text unique not null,
+        canonical_username text unique not null,
         username text unique not null,
         password text not null,
 
@@ -26,6 +29,51 @@ schema = """
     create unique index user_listen_by on user_listen(by, to_);
     create index user_listen_to on user_listen(to_);
 """
+
+def canonicaliseUsername(username, ignoreSpaces = False, throws = True):
+    # Read stringprep documentation for the meaning of the tables
+
+    chars = list(username)
+    for c, char in enumerate(chars):
+        if stringprep.in_table_a1(char):
+            if throws:
+                raise ValueError
+            else:
+                chars[c] = u""
+        elif stringprep.in_table_b1(char):
+            chars[c] = u""
+        else:
+            chars[c] = stringprep.map_table_b2(char)
+
+    chars = list(stringprep.unicodedata.normalize("NFKC", u"".join(chars)))
+
+    for c, char in enumerate(chars):
+        if ((not ignoreSpaces and stringprep.in_table_c11_c12(char)) or
+            stringprep.in_table_c21_c22(char) or
+            stringprep.in_table_c3(char) or
+            stringprep.in_table_c4(char) or
+            stringprep.in_table_c5(char) or
+            stringprep.in_table_c6(char) or
+            stringprep.in_table_c7(char) or
+            stringprep.in_table_c8(char) or
+            stringprep.in_table_c9(char)):
+            if throws:
+                raise ValueError
+            else:
+                chars[c] = u""
+
+    chars = u"".join(chars)
+
+    if throws:
+        RandAL = map(stringprep.in_table_d1, chars)
+        for c in RandAL:
+            if c:
+                if filter(stringprep.in_table_d2, chars):
+                    raise ValueError
+                if not RandAL[0] or not RandAL[-1]:
+                    raise ValueError
+
+    return chars
 
 class User(Model):
     publicProperties = set((
@@ -60,14 +108,26 @@ class User(Model):
     def _buildWhereClause(cls, where):
         search = where.pop("search", None)
 
+        if "username" in where:
+            where["canonicalUsername"] = canonicaliseUsername(where["username"], throws = False)
+            del where["username"]
+
         result = super(User, cls)._buildWhereClause(where)
 
         if search:
+            search = canonicaliseUsername(search, ignoreSpaces = True, throws = False)
             search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            search = "%" + search.replace(" ", "%") + "%"
-            result["(username || \" \" || name) like ? escape \"\\\""] = search
+            search = "%" + re.sub(re.compile("\s+", re.UNICODE), "%", search) + "%"
+            result["(canonical_username || \" \" || ifnull(name, \"\")) like ? escape \"\\\""] = search
 
         return result
+
+    @classmethod
+    def create(cls, properties):
+        if "username" in properties:
+            properties["canonicalUsername"] = canonicaliseUsername(properties["username"], throws = False)
+
+        return super(User, cls).create(properties)
 
     @classmethod
     def update(cls, where, update):
@@ -82,6 +142,9 @@ class User(Model):
 
         if len(ids) == 0:
             return
+
+        if "username" in update:
+            update["canonicalUsername"] = canonicaliseUsername(update["username"], throws = False)
 
         if "listeningTo" in update:
             cur.execute("delete from user_listen where by in ({0})".format(", ".join(["?"] * len(ids))), ids)

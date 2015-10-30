@@ -38,11 +38,12 @@ with db:
     # Read all the bleats
     bleats = {}
     for bleatId in os.listdir(os.path.join(sys.argv[1], "bleats")):
+        bleatId = bleatId.decode("utf8")
         bleat = {}
 
-        with open(os.path.join(sys.argv[1], "bleats", bleatId), "r") as handle:
+        with open(os.path.join(sys.argv[1], "bleats", bleatId.encode("utf8")), "r") as handle:
             for line in handle:
-                line = line.strip()
+                line = line.decode("utf8").strip()
                 if not line:
                     continue
 
@@ -75,11 +76,12 @@ with db:
     # Read and import all the users
     users = {}
     for username in os.listdir(os.path.join(sys.argv[1], "users")):
+        username = username.decode("utf8")
         user = {}
 
-        with open(os.path.join(sys.argv[1], "users", username, "details.txt"), "r") as handle:
+        with open(os.path.join(sys.argv[1], "users", username.encode("utf8"), "details.txt"), "r") as handle:
             for line in handle:
-                line = line.strip()
+                line = line.decode("utf8").strip()
                 if not line:
                     continue
 
@@ -113,26 +115,26 @@ with db:
         try:
             # SHA-256 hash the profile image and save it to the uploads directory
             # XXX: Assumes it's small enough to fit in memory
-            with open(os.path.join(sys.argv[1], "users", username, "profile.jpg"), "rb") as handle:
+            with open(os.path.join(sys.argv[1], "users", username.encode("utf8"), "profile.jpg"), "rb") as handle:
                 profileImage = handle.read()
             hash = hashlib.sha256(profileImage).hexdigest()
 
             with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "uploads", hash), "wb") as handle:
                 handle.write(profileImage)
 
-            user["profileImage"] = File(hash = hash, name = "profile.jpg")
+            user["profileImage"] = File(hash = hash, name = u"profile.jpg")
         except IOError:
             pass
 
-        users[user["username"]] = user = User.create(user)
+        users[username] = user = User.create(user)
 
         if listeningTo:
             setattr(user, "listeningTo", listeningTo)
 
         # Put the user id in the bleats
-        with open(os.path.join(sys.argv[1], "users", username, "bleats.txt"), "r") as handle:
+        with open(os.path.join(sys.argv[1], "users", username.encode("utf8"), "bleats.txt"), "r") as handle:
             for bleatId in handle:
-                bleatId = bleatId.strip()
+                bleatId = bleatId.decode("utf8").strip()
                 if not bleatId:
                     continue
 

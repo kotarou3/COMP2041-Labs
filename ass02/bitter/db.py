@@ -1,4 +1,5 @@
 import sqlite3
+import subprocess
 import os
 
 class Coordinates(object):
@@ -16,18 +17,23 @@ def convert_coordinates(s):
     return Coordinates(lat, lon)
 
 class File(object):
-    def __init__(self, hash, name):
-        self.hash, self.name = hash, name
+    def __init__(self, hash, name, mime = None):
+        if not mime:
+            # subprocess.check_output not supported until v2.7
+            process = subprocess.Popen(["file", "-b", "--mime-type", "--", os.path.join(os.path.dirname(os.path.realpath(__file__)), "uploads", hash)], stdout = subprocess.PIPE)
+            mime = process.communicate()[0].strip()
+
+        self.hash, self.name, self.mime = hash, name, mime
 
     def __repr__(self):
-        return "<File {0}: {1}>".format(self.hash, repr(self.name))
+        return "<File {0} {1}: {2}>".format(self.mime, self.hash, repr(self.name))
 
 def adapt_file(file):
-    return u"{0}:{1}".format(file.hash, file.name)
+    return u"{0}:{1}:{2}".format(file.hash, file.mime, file.name)
 
 def convert_file(s):
-    hash, name = s.split(":", 1)
-    return File(hash = hash, name = name)
+    hash, mime, name = s.split(":", 2)
+    return File(hash = hash, name = name, mime = mime)
 
 sqlite3.enable_callback_tracebacks(True)
 sqlite3.register_adapter(Coordinates, adapt_coordinates)

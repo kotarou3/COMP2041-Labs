@@ -7,19 +7,24 @@ from bitter.renderer import render
 from bitter.router import defaultRoutes
 
 class SessionController(Controller):
+    idType = unicode
+    overallSchema = {}
+
+    findSchema = {"page": int}
+
+    createOneSchema = {
+        "email": unicode,
+        "username": unicode,
+        "password": unicode
+    }
+
     @classmethod
     def find(cls, req, res):
         if not req.user:
             res.status = 403
             return
 
-        try:
-            page = int(req.params.pop("page", 1))
-        except ValueError:
-            res.status = 400
-            return
-
-        return Session.paginate({"user": req.user.id}, page = page)
+        return Session.paginate({"user": req.user.id}, page = req.params.pop("page", 1))
 
     @classmethod
     def findOne(cls, req, res):
@@ -27,10 +32,7 @@ class SessionController(Controller):
 
     @classmethod
     def createOne(cls, req, res):
-        if "id" in req.body:
-            del req.body["id"]
-
-        user = User.findOne(cls._whitelistParams(req.body))
+        user = User.findOne(req.body)
         if not user:
             res.status = 400
             render(req, res, "session/new.html.bepy")
@@ -65,10 +67,5 @@ class SessionController(Controller):
         return Session.delete({"id": req.params["id"]})
 
     _Model = Session
-    _whitelistedProperties = set((
-        "email",
-        "username",
-        "password"
-    ))
 
 defaultRoutes[("DELETE", "^/session/(?P<id>[a-zA-Z0-9-_=]+)$")] = SessionController.deleteOneAndRender

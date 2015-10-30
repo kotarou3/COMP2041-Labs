@@ -63,7 +63,7 @@ def getValueOrFile(field):
 res = Response(headers = {"Content-Type": "text/plain"})
 try:
     # Extract the file extension if any
-    pathParts = os.environ.get("PATH_INFO", "/").rsplit(".", 1)
+    pathParts = utf8Decode(os.environ.get("PATH_INFO", "/")).rsplit(".", 1)
     path = pathParts[0]
     fileext = ""
     if len(pathParts) > 1:
