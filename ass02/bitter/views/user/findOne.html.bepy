@@ -38,10 +38,15 @@
                 <% %>
             </div>
             <div class="col-md-10">
-                <h5><strong><%= model.name or model.username %> (@<%= model.username %>) at <%= bleat.timestamp.ctime() %>:</strong></h5>
+                <h5><strong><%= model.name or model.username %> (@<%= model.username %>) at <%= bleat.timestamp.ctime() %> (<%= len(bleat.attachments) %> Attachments):</strong></h5>
                 <p><%= bleat.content %></p>
                 <% if req.user: %>
-                    <p><a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(bleat.id) %>">Reply</a></p>
+                    <p>
+                        <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(bleat.id) %>">Reply</a>
+                        <% if req.user.id == model.id: %>
+                            <button class="btn btn-danger" onclick="deleteBleat(<%= bleat.id %>, true)">Delete</button>
+                        <% %>
+                    </p>
                 <% %>
             </div>
         </div>

@@ -13,7 +13,7 @@
                 <% %>
             </div>
             <div class="col-md-10">
-                <h5><strong><%= user.name or user.username %> (@<%= user.username %>) at <%= bleat.timestamp.ctime() %>:</strong></h5>
+                <h5><strong><%= user.name or user.username %> (@<%= user.username %>) at <%= bleat.timestamp.ctime() %> (<%= len(bleat.attachments) %> Attachments):</strong></h5>
                 <p><%= bleat.content %></p>
                 <% if req.user: %>
                     <p>
@@ -23,6 +23,9 @@
                             <button class="btn btn-default" onclick="listen(true, <%= user.id %>)">Listen to <%= user.name or user.username %></button>
                         <% %>
                         <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(bleat.id) %>">Reply</a>
+                        <% if req.user.id == user.id: %>
+                            <button class="btn btn-danger" onclick="deleteBleat(<%= bleat.id %>, true)">Delete</button>
+                        <% %>
                     </p>
                 <% %>
             </div>

@@ -15,6 +15,19 @@
                     alert("Failed to " + (targetState ? "" : "un") + "listen to the user for some reason.");
                 });
             }
+
+            function deleteBleat(bleatId, isRefreshEnough) {
+                $.ajax("<%= req.baseUri + "/bleat/" %>" + bleatId + ".json?csrfToken=<%= req.session.csrfToken if req.user else "" %>", {method: "DELETE"})
+                .done(function () {
+                    if (isRefreshEnough)
+                        location.reload();
+                    else
+                        location = "<%= req.baseUri %>/";
+                })
+                .fail(function () {
+                    alert("Deletion Failure. Somehow.");
+                });
+            }
         </script>
     </head>
 <% if "backgroundImage" in vars() and backgroundImage: %>
@@ -46,9 +59,9 @@
                                     <li class="divider"></li>
                                     <script>
                                         function logout() {
-                                            $.ajax("<%= req.baseUri + "/session/" + req.session.csrfToken %>.json?csrfToken=<%= req.session.csrfToken %>", {method: "DELETE"})
+                                            $.ajax("<%= req.baseUri + "/session/" + req.session.csrfToken + ".json?csrfToken=" + req.session.csrfToken %>", {method: "DELETE"})
                                             .done(function () {
-                                                location.reload();
+                                                location = "<%= req.baseUri %>/";
                                             })
                                             .fail(function () {
                                                 alert("Logout Failure. Somehow.");

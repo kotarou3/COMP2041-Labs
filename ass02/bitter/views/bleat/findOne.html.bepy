@@ -16,7 +16,7 @@
                 <% %>
             </div>
             <div class="col-md-10">
-                <h5><strong><%= inReplyToUser.name or inReplyToUser.username %> (@<%= inReplyToUser.username %>) at <%= inReplyTo.timestamp.ctime() %>:</strong></h5>
+                <h5><strong><%= inReplyToUser.name or inReplyToUser.username %> (@<%= inReplyToUser.username %>) at <%= inReplyTo.timestamp.ctime() %> (<%= len(inReplyTo.attachments) %> Attachments):</strong></h5>
                 <p><%= inReplyTo.content %></p>
                 <% if req.user: %>
                     <p>
@@ -26,6 +26,9 @@
                             <button class="btn btn-default" onclick="listen(true, <%= inReplyToUser.id %>)">Listen to <%= inReplyToUser.name or inReplyToUser.username %></button>
                         <% %>
                         <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(inReplyTo.id) %>">Reply</a>
+                        <% if req.user.id == inReplyToUser.id: %>
+                            <button class="btn btn-danger" onclick="deleteBleat(<%= inReplyTo.id %>, true)">Delete</button>
+                        <% %>
                     </p>
                 <% %>
             </div>
@@ -43,7 +46,14 @@
         <% %>
     </div>
     <div class="col-md-9">
-        <h5><strong><%= user.name or user.username %> (@<%= user.username %>) at <%= model.timestamp.ctime() %>:</strong></h5>
+        <% if model.attachments: %>
+            <p>
+                <% for attachment in model.attachments: %>
+                    <a class="btn btn-default" href="<%= req.baseUri + "/upload/" + attachment.hash %>"><img style="width: 200px" src="<%= req.baseUri + "/upload/" + attachment.hash %>" /></a>
+                <% %>
+            </p>
+        <% %>
+        <h5><strong><%= user.name or user.username %> (@<%= user.username %>) at <%= model.timestamp.ctime() %> (<%= len(model.attachments) %> Attachments):</strong></h5>
         <p><%= model.content %></p>
         <% if req.user: %>
             <p>
@@ -53,6 +63,9 @@
                     <button class="btn btn-default" onclick="listen(true, <%= user.id %>)">Listen to <%= user.name or user.username %></button>
                 <% %>
                 <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(model.id) %>">Reply</a>
+                <% if req.user.id == user.id: %>
+                    <button class="btn btn-danger" onclick="deleteBleat(<%= model.id %>, false)">Delete</button>
+                <% %>
             </p>
         <% %>
     </div>
@@ -70,7 +83,7 @@
                 <% %>
             </div>
             <div class="col-md-10">
-                <h5><strong><%= responseUser.name or responseUser.username %> (@<%= responseUser.username %>) at <%= response.timestamp.ctime() %>:</strong></h5>
+                <h5><strong><%= responseUser.name or responseUser.username %> (@<%= responseUser.username %>) at <%= response.timestamp.ctime() %> (<%= len(response.attachments) %> Attachments):</strong></h5>
                 <p><%= response.content %></p>
                 <% if req.user: %>
                     <p>
@@ -80,6 +93,9 @@
                             <button class="btn btn-default" onclick="listen(true, <%= responseUser.id %>)">Listen to <%= responseUser.name or responseUser.username %></button>
                         <% %>
                         <a class="btn btn-default" href="<%= req.baseUri + "/bleat/new?inReplyTo=" + unicode(response.id) %>">Reply</a>
+                        <% if req.user.id == responseUser.id: %>
+                            <button class="btn btn-danger" onclick="deleteBleat(<%= response.id %>, true)">Delete</button>
+                        <% %>
                     </p>
                 <% %>
             </div>
