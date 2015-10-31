@@ -109,7 +109,7 @@ def hashPassword(password):
     iters = 100000
     salt = os.urandom(32)
     hash = pbkdf2(password.encode("utf8"), salt, iters, 32, hashlib.sha256)
-    return "{0}${1}${2}".format(iters, base64.b64encode(salt), base64.b64encode(hash))
+    return "{0}${1}${2}".format(iters, base64.b64encode(buffer(salt)), base64.b64encode(buffer(hash)))
 
 def checkPassword(password, hashedPassword):
     iters, salt, hash = hashedPassword.split("$")

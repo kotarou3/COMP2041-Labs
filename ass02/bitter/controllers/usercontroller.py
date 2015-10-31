@@ -110,6 +110,8 @@ class UserController(Controller):
             req.user = user
             req.session = session
 
+        render(req, res, "redirect-home.html.bepy")
+
     @classmethod
     def updateOne(cls, req, res):
         if not req.user or req.user.id != req.params["id"]:
