@@ -28,6 +28,19 @@
                     alert("Deletion Failure. Somehow.");
                 });
             }
+
+            function logout(sessionCsrfToken) {
+                $.ajax("<%= req.baseUri + "/session/" %>" + sessionCsrfToken + ".json?csrfToken=<%= req.session.csrfToken if req.user else "" %>", {method: "DELETE"})
+                .done(function () {
+                    if (sessionCsrfToken == "<%= req.session.csrfToken if req.user else "" %>")
+                        location = "<%= req.baseUri %>/";
+                    else
+                        location.reload();
+                })
+                .fail(function () {
+                    alert("Logout Failure. Somehow.");
+                });
+            }
         </script>
     </head>
 <% if "backgroundImage" in vars() and backgroundImage: %>
@@ -57,18 +70,8 @@
                                     <li><a href="<%= req.baseUri + "/user/" + unicode(req.user.id) %>">View Profile</a></li>
                                     <li><a href="<%= req.baseUri + "/user/" + unicode(req.user.id) + "/edit" %>">Edit Profile and Settings</a></li>
                                     <li class="divider"></li>
-                                    <script>
-                                        function logout() {
-                                            $.ajax("<%= req.baseUri + "/session/" + req.session.csrfToken + ".json?csrfToken=" + req.session.csrfToken %>", {method: "DELETE"})
-                                            .done(function () {
-                                                location = "<%= req.baseUri %>/";
-                                            })
-                                            .fail(function () {
-                                                alert("Logout Failure. Somehow.");
-                                            });
-                                        }
-                                    </script>
-                                    <li><a href="#" onclick="logout()">Logout</a></li>
+                                    <li><a href="<%= req.baseUri + "/session" %>">View Active Sessions</a></li>
+                                    <li><a href="#" onclick="logout('<%= req.session.csrfToken %>')">Logout</a></li>
                                 </ul>
                             </li>
                         <% else: %>

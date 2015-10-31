@@ -1,0 +1,13 @@
+<% include("header.html.bepy", {"title": "Active Sessions"}) %>
+<table class="table table-striped">
+    <tr><th>Last IP Address Used</th><th>Last Accessed At</th><th> </th></tr>
+<% for session in model["records"]: %>
+    <tr>
+        <td><%= session.lastAddress %></td>
+        <td><%= session.lastUse.ctime() %></td>
+        <td><button class="btn btn-warning" onclick="logout('<%= session.csrfToken %>')">Force Logout</button></td>
+    </tr>
+<% %>
+</table>
+<% include("pagination.html.bepy", {"model": model}) %>
+<% include("footer.html.bepy") %>
